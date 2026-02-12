@@ -25,6 +25,10 @@ if (-not (Test-Path ".\.venv\Scripts\python.exe")) {
     --paths . `
     .\run_adm.py
 
+if (Test-Path ".\README_EXE_GEBRUIK.pdf") {
+    Copy-Item ".\README_EXE_GEBRUIK.pdf" -Destination ".\dist\ADM\README_EXE_GEBRUIK.pdf" -Force
+}
+
 Write-Host ""
 Write-Host "Build complete:"
 Write-Host "  dist\ADM\ADM.exe"

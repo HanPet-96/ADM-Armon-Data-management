@@ -9,6 +9,8 @@ from pathlib import Path
 @dataclass
 class AppSettings:
     data_root: str
+    theme_mode: str = "light"
+    has_seen_help: bool = False
 
 
 def app_data_dir() -> Path:
@@ -37,13 +39,22 @@ def load_settings(default_data_root: Path, settings_path: Path | None = None) ->
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         data_root = str(payload.get("data_root", str(default_data_root)))
-        return AppSettings(data_root=data_root)
+        theme_mode = str(payload.get("theme_mode", "light")).lower()
+        if theme_mode not in {"light", "dark"}:
+            theme_mode = "light"
+        has_seen_help = bool(payload.get("has_seen_help", False))
+        return AppSettings(data_root=data_root, theme_mode=theme_mode, has_seen_help=has_seen_help)
     except Exception:
-        return AppSettings(data_root=str(default_data_root))
+        return AppSettings(data_root=str(default_data_root), theme_mode="light", has_seen_help=False)
 
 
 def save_settings(settings: AppSettings, settings_path: Path | None = None) -> None:
     path = settings_path or default_settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"data_root": settings.data_root}
+    theme_mode = settings.theme_mode if settings.theme_mode in {"light", "dark"} else "light"
+    payload = {
+        "data_root": settings.data_root,
+        "theme_mode": theme_mode,
+        "has_seen_help": bool(settings.has_seen_help),
+    }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

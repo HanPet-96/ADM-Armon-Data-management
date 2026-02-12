@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 from PySide6.QtCore import QEasingCurve, Property, QPropertyAnimation, QRectF, QSize, QTimer, Qt
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import QColor, QPainter, QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
 )
 
+from . import __version__
 from .indexer import run_index
 from .settings_store import AppSettings, save_settings
 from .search import (
@@ -195,10 +196,10 @@ class ToggleSwitch(QCheckBox):
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, data_root: str, parent: QWidget | None = None) -> None:
+    def __init__(self, data_root: str, theme_mode: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.resize(700, 160)
+        self.resize(700, 220)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Datastruct folder"))
         row = QHBoxLayout()
@@ -208,6 +209,14 @@ class SettingsDialog(QDialog):
         row.addWidget(self.data_root_input)
         row.addWidget(browse_button)
         layout.addLayout(row)
+
+        theme_row = QHBoxLayout()
+        theme_row.addWidget(QLabel("Dark mode"))
+        self.theme_toggle = ToggleSwitch()
+        self.theme_toggle.setChecked(theme_mode.lower() == "dark")
+        theme_row.addWidget(self.theme_toggle)
+        theme_row.addStretch(1)
+        layout.addLayout(theme_row)
 
         actions = QHBoxLayout()
         save_button = QPushButton("Save")
@@ -227,14 +236,25 @@ class SettingsDialog(QDialog):
     def selected_data_root(self) -> str:
         return self.data_root_input.text().strip()
 
+    def selected_theme_mode(self) -> str:
+        return "dark" if self.theme_toggle.isChecked() else "light"
+
 
 class MainWindow(QMainWindow):
-    def __init__(self, conn: sqlite3.Connection, data_root: str) -> None:
+    def __init__(
+        self,
+        conn: sqlite3.Connection,
+        data_root: str,
+        theme_mode: str = "light",
+        has_seen_help: bool = False,
+    ) -> None:
         super().__init__()
         self.conn = conn
         self.data_root = data_root
+        self.theme_mode = theme_mode if theme_mode in {"light", "dark"} else "light"
+        self.has_seen_help = has_seen_help
         self.tree_root_article_id: int | None = None
-        self.setWindowTitle("ADM - Armon Data Management")
+        self.setWindowTitle(f"ADM - Armon Data Management v{__version__}")
         self.resize(1250, 740)
 
         root = QWidget()
@@ -245,10 +265,13 @@ class MainWindow(QMainWindow):
         self.reindex_button = QPushButton("Re-index")
         self.unlinked_button = QPushButton("Unlinked docs")
         self.settings_button = QPushButton("Settings")
+        self.help_button = QPushButton("?")
+        self.help_button.setToolTip("Open user guide")
         top_actions.addStretch(1)
         top_actions.addWidget(self.reindex_button)
         top_actions.addWidget(self.unlinked_button)
         top_actions.addWidget(self.settings_button)
+        top_actions.addWidget(self.help_button)
         root_layout.addLayout(top_actions)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -374,6 +397,7 @@ class MainWindow(QMainWindow):
         self.reindex_button.clicked.connect(self.reindex)
         self.unlinked_button.clicked.connect(self.open_unlinked_docs)
         self.settings_button.clicked.connect(self.open_settings)
+        self.help_button.clicked.connect(self.open_help_manual_clicked)
         self.article_table.itemSelectionChanged.connect(self.load_selected_article)
         self.article_tree.itemClicked.connect(self.on_tree_item_clicked)
         self.docs_list.itemDoubleClicked.connect(lambda item: open_file(item.data(Qt.ItemDataRole.UserRole)))
@@ -383,6 +407,9 @@ class MainWindow(QMainWindow):
 
         self.refresh_articles()
         QTimer.singleShot(0, self._set_initial_split_sizes)
+        self.apply_theme(self.theme_mode)
+        if not self.has_seen_help:
+            QTimer.singleShot(250, self.open_help_manual_first_run)
 
     def refresh_articles(self) -> None:
         rows = list_articles(
@@ -600,7 +627,7 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def open_settings(self) -> None:
-        dlg = SettingsDialog(self.data_root, self)
+        dlg = SettingsDialog(self.data_root, self.theme_mode, self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         new_root = dlg.selected_data_root()
@@ -612,7 +639,15 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Invalid setting", "Selected Datastruct folder does not exist.")
             return
         self.data_root = str(new_path.resolve())
-        save_settings(AppSettings(data_root=self.data_root))
+        self.theme_mode = dlg.selected_theme_mode()
+        save_settings(
+            AppSettings(
+                data_root=self.data_root,
+                theme_mode=self.theme_mode,
+                has_seen_help=self.has_seen_help,
+            )
+        )
+        self.apply_theme(self.theme_mode)
         should_reindex = QMessageBox.question(
             self,
             "Settings saved",
@@ -678,6 +713,131 @@ class MainWindow(QMainWindow):
         else:
             item.setBackground(QColor(170, 100, 20))
 
+    def apply_theme(self, theme_mode: str) -> None:
+        apply_app_theme(theme_mode)
+
+    def resolve_help_pdf_path(self) -> Path | None:
+        candidates = [
+            Path(sys.executable).resolve().parent / "README_EXE_GEBRUIK.pdf",
+            Path(__file__).resolve().parents[1] / "README_EXE_GEBRUIK.pdf",
+            Path.cwd() / "README_EXE_GEBRUIK.pdf",
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return None
+
+    def open_help_manual_clicked(self) -> None:
+        self.open_help_manual(mark_seen=True, show_warning=True)
+
+    def open_help_manual_first_run(self) -> None:
+        self.open_help_manual(mark_seen=True, show_warning=True)
+
+    def open_help_manual(self, mark_seen: bool, show_warning: bool) -> None:
+        help_pdf = self.resolve_help_pdf_path()
+        if help_pdf is None:
+            if show_warning:
+                QMessageBox.warning(
+                    self,
+                    "User guide not found",
+                    "README_EXE_GEBRUIK.pdf was not found next to the app.",
+                )
+        else:
+            open_file(str(help_pdf))
+
+        if mark_seen and not self.has_seen_help:
+            self.has_seen_help = True
+            save_settings(
+                AppSettings(
+                    data_root=self.data_root,
+                    theme_mode=self.theme_mode,
+                    has_seen_help=True,
+                )
+            )
+
+
+def apply_app_theme(theme_mode: str) -> None:
+    app = QApplication.instance()
+    if app is None:
+        return
+    app.setStyle("Fusion")
+    mode = theme_mode if theme_mode in {"light", "dark"} else "light"
+    if mode == "dark":
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("#1E1E1E"))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("#EDEDED"))
+        palette.setColor(QPalette.ColorRole.Base, QColor("#252525"))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#1E1E1E"))
+        palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#252525"))
+        palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#EDEDED"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("#F2F2F2"))
+        palette.setColor(QPalette.ColorRole.Button, QColor("#2B2B2B"))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F2F2F2"))
+        palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 255, 255))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor("#97C21E"))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+        app.setPalette(palette)
+        app.setStyleSheet(
+            """
+            QLineEdit, QTableWidget, QTreeWidget, QListWidget, QComboBox {
+                background: #252525;
+                color: #F2F2F2;
+                border: 1px solid #3A3A3A;
+            }
+            QPushButton {
+                background: #2B2B2B;
+                color: #F2F2F2;
+                border: 1px solid #444444;
+                padding: 4px 10px;
+            }
+            QPushButton:hover { background: #333333; }
+            QHeaderView::section {
+                background: #2F2F2F;
+                color: #F2F2F2;
+                border: 1px solid #3A3A3A;
+                padding: 4px;
+            }
+            """
+        )
+        return
+
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor("#FFFFFF"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#111111"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#FFFFFF"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#F7F7F7"))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#FFFFFF"))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#111111"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#111111"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#F3F4F6"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#111111"))
+    palette.setColor(QPalette.ColorRole.BrightText, QColor("#111111"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor("#97C21E"))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#111111"))
+    app.setPalette(palette)
+    app.setStyleSheet(
+        """
+        QLineEdit, QTableWidget, QTreeWidget, QListWidget, QComboBox {
+            background: #FFFFFF;
+            color: #111111;
+            border: 1px solid #D1D5DB;
+        }
+        QPushButton {
+            background: #F3F4F6;
+            color: #111111;
+            border: 1px solid #D1D5DB;
+            padding: 4px 10px;
+        }
+        QPushButton:hover { background: #E5E7EB; }
+        QHeaderView::section {
+            background: #F9FAFB;
+            color: #111111;
+            border: 1px solid #D1D5DB;
+            padding: 4px;
+        }
+        """
+    )
+
 
 def open_file(path: str) -> None:
     if not path:
@@ -688,8 +848,14 @@ def open_file(path: str) -> None:
     subprocess.run(["xdg-open", path], check=False)
 
 
-def run_ui(conn: sqlite3.Connection, data_root: str) -> int:
+def run_ui(
+    conn: sqlite3.Connection,
+    data_root: str,
+    theme_mode: str = "light",
+    has_seen_help: bool = False,
+) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
-    win = MainWindow(conn, data_root=data_root)
+    apply_app_theme(theme_mode)
+    win = MainWindow(conn, data_root=data_root, theme_mode=theme_mode, has_seen_help=has_seen_help)
     win.show()
     return app.exec()
