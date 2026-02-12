@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 from PySide6.QtCore import QEasingCurve, Property, QPropertyAnimation, QRectF, QSize, QTimer, Qt
-from PySide6.QtGui import QColor, QPainter, QPalette
+from PySide6.QtGui import QColor, QIcon, QPainter, QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -65,12 +65,37 @@ except Exception:
     PDF_PREVIEW_AVAILABLE = False
 
 
+def resolve_app_icon_path() -> Path | None:
+    candidates = [
+        Path(sys.executable).resolve().parent / "Icon.ico",
+        Path(__file__).resolve().parents[1] / "Icon.ico",
+        Path.cwd() / "Icon.ico",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def get_app_icon() -> QIcon | None:
+    icon_path = resolve_app_icon_path()
+    if icon_path is None:
+        return None
+    icon = QIcon(str(icon_path))
+    if icon.isNull():
+        return None
+    return icon
+
+
 class PartDialog(QDialog):
     def __init__(self, conn: sqlite3.Connection, part_number: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.conn = conn
         self.part = get_part_detail(conn, part_number)
         self.setWindowTitle(f"Part: {part_number}")
+        icon = get_app_icon()
+        if icon is not None:
+            self.setWindowIcon(icon)
         self.resize(760, 420)
         layout = QVBoxLayout(self)
 
@@ -121,6 +146,9 @@ class UnlinkedDocsDialog(QDialog):
     def __init__(self, conn: sqlite3.Connection, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Unlinked documents")
+        icon = get_app_icon()
+        if icon is not None:
+            self.setWindowIcon(icon)
         self.resize(980, 520)
         layout = QVBoxLayout(self)
         self.table = QTableWidget(0, 3)
@@ -202,6 +230,9 @@ class SettingsDialog(QDialog):
     def __init__(self, data_root: str, theme_mode: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
+        icon = get_app_icon()
+        if icon is not None:
+            self.setWindowIcon(icon)
         self.resize(700, 220)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Datastruct folder"))
@@ -296,6 +327,9 @@ class MainWindow(QMainWindow):
         self.tree_root_article_id: int | None = None
         self._update_check_done = False
         self.setWindowTitle(f"ADM - Armon Data Management v{__version__}")
+        icon = get_app_icon()
+        if icon is not None:
+            self.setWindowIcon(icon)
         self.resize(1250, 740)
 
         root = QWidget()
@@ -924,6 +958,9 @@ def run_ui(
     has_seen_help: bool = False,
 ) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
+    icon = get_app_icon()
+    if icon is not None:
+        app.setWindowIcon(icon)
     apply_app_theme(theme_mode)
     win = MainWindow(conn, data_root=data_root, theme_mode=theme_mode, has_seen_help=has_seen_help)
     win.show()

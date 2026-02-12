@@ -74,6 +74,14 @@ Build dependencies are installed from:
 
 - `requirements-build.txt`
 
+## App icon (Icon.ico)
+- Place your icon file here:
+  - `Icon.ico` in repo root (`ADM-Armon-Data-management\Icon.ico`)
+- The app uses it for:
+  - Main window icon
+  - Popup/dialog icons (Settings, Part detail, Unlinked docs)
+  - Built `ADM.exe` icon (via `build_adm.bat`)
+
 ## UI highlights
 - Article list with search
 - Animated toggle to show/hide subassemblies in article list/search

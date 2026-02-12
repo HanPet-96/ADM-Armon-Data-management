@@ -42,7 +42,11 @@ if errorlevel 1 (
 )
 
 echo [2/3] Running PyInstaller build...
-call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+if exist "%CD%\Icon.ico" (
+  call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --icon "%CD%\Icon.ico" --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+) else (
+  call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+)
 if errorlevel 1 (
   echo [ERROR] Build failed.
   echo [ERROR] Build failed. See: !LOG_FILE!
@@ -73,6 +77,9 @@ if exist "%CD%\README.md" (
 )
 if exist "%CD%\RELEASE_CHECKLIST_V1.md" (
   copy /Y "%CD%\RELEASE_CHECKLIST_V1.md" "!FINAL_DIST!\RELEASE_CHECKLIST_V1.md" >nul
+)
+if exist "%CD%\Icon.ico" (
+  copy /Y "%CD%\Icon.ico" "!FINAL_DIST!\Icon.ico" >nul
 )
 
 echo [4/4] Final checks...

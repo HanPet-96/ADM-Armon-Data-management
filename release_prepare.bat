@@ -9,7 +9,7 @@ if "%PY_EXE%"=="" if exist "..\.venv\Scripts\python.exe" set "PY_EXE=..\.venv\Sc
 if "%PY_EXE%"=="" set "PY_EXE=python"
 
 set "REL_VERSION=%~1"
-if "%REL_VERSION%"=="" set "REL_VERSION=1.0.0.2"
+if "%REL_VERSION%"=="" set "REL_VERSION=1.0.0.3"
 
 echo Preparing release version %REL_VERSION%...
 call "%PY_EXE%" ".\scripts\release_prepare.py" --version "%REL_VERSION%"

@@ -591,6 +591,11 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\ui.py',
    'PYMODULE'),
+  ('adm_app.update_check',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\update_check.py',
+   'PYMODULE'),
   ('annotationlib',
    'C:\\Program Files\\Python314\\Lib\\annotationlib.py',
    'PYMODULE'),
