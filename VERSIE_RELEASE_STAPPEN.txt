@@ -1,0 +1,33 @@
+ADM release stappen (voorbeeld: van 1.0.0.1 naar 1.0.0.2)
+
+1) Open terminal in deze map:
+   D:\Onedrive\OneDrive - Armon Products B.V\Project ADM (Armon Document Management) - Project ADM\TestStructuur ADM\Script\ADM-Armon-Data-management
+
+2) Verhoog versienummer:
+   release_prepare.bat 1.0.0.2
+
+3) Commit en push:
+   - Open GitHub Desktop
+   - Controleer wijzigingen
+   - Commit message: Release v1.0.0.2
+   - Push origin
+
+4) Build distributie:
+   build_adm.bat
+
+5) Maak zip van:
+   dist\ADM_portable
+   Voorbeeldnaam: ADM_v1.0.0.2_portable.zip
+
+6) Publiceer GitHub Release:
+   - Ga naar: https://github.com/HanPet-96/ADM-Armon-Data-management/releases
+   - Draft a new release
+   - Tag: v1.0.0.2
+   - Title: ADM v1.0.0.2
+   - Upload de zip als release asset
+   - Publish release
+
+7) Update-check in app:
+   - App vergelijkt lokale versie met laatste GitHub release tag
+   - Is tag hoger? Dan meldt app dat er een nieuwe versie beschikbaar is
+   - Settings -> Check for updates opent releases link bij update

@@ -105,3 +105,11 @@ Build dependencies are installed from:
    - `dist\ADM_portable`
 5. Create GitHub Release with tag:
    - `v1.0.0.1`
+
+## Automatic update check
+- On startup, ADM checks GitHub `latest release` for this repo:
+  - `HanPet-96/ADM-Armon-Data-management`
+- If the latest tag is higher than the installed app version, ADM shows an update prompt.
+- To trigger this for users, publish a new GitHub release with a higher tag, for example:
+  - current app: `1.0.0.1`
+  - new release tag: `v1.0.0.2`

@@ -50,6 +50,9 @@ from .search import (
     get_unlinked_documents,
     list_articles,
 )
+from .update_check import fetch_latest_github_release, is_newer_version
+
+RELEASES_URL = "https://github.com/HanPet-96/ADM-Armon-Data-management/releases"
 
 try:
     from PySide6.QtPdf import QPdfDocument
@@ -219,10 +222,13 @@ class SettingsDialog(QDialog):
         layout.addLayout(theme_row)
 
         actions = QHBoxLayout()
+        self.check_updates_button = QPushButton("Check for updates")
         save_button = QPushButton("Save")
         cancel_button = QPushButton("Cancel")
+        self.check_updates_button.clicked.connect(self.check_for_updates_clicked)
         save_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
+        actions.addWidget(self.check_updates_button)
         actions.addStretch(1)
         actions.addWidget(save_button)
         actions.addWidget(cancel_button)
@@ -239,6 +245,40 @@ class SettingsDialog(QDialog):
     def selected_theme_mode(self) -> str:
         return "dark" if self.theme_toggle.isChecked() else "light"
 
+    def check_for_updates_clicked(self) -> None:
+        latest = fetch_latest_github_release()
+        if not latest:
+            QMessageBox.information(
+                self,
+                "Update check",
+                "Latest version could not be retrieved from GitHub.",
+            )
+            return
+        latest_tag = str(latest.get("tag_name") or "").strip()
+        if not latest_tag:
+            QMessageBox.information(
+                self,
+                "Update check",
+                "Latest version could not be retrieved from GitHub.",
+            )
+            return
+        if is_newer_version(__version__, latest_tag):
+            answer = QMessageBox.question(
+                self,
+                "Update available",
+                f"Installed version: {__version__}\nLatest version: {latest_tag}\n\nOpen releases page now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                open_file(RELEASES_URL)
+            return
+        QMessageBox.information(
+            self,
+            "Up to date",
+            f"You are on the latest version ({__version__}).",
+        )
+
 
 class MainWindow(QMainWindow):
     def __init__(
@@ -254,6 +294,7 @@ class MainWindow(QMainWindow):
         self.theme_mode = theme_mode if theme_mode in {"light", "dark"} else "light"
         self.has_seen_help = has_seen_help
         self.tree_root_article_id: int | None = None
+        self._update_check_done = False
         self.setWindowTitle(f"ADM - Armon Data Management v{__version__}")
         self.resize(1250, 740)
 
@@ -410,6 +451,7 @@ class MainWindow(QMainWindow):
         self.apply_theme(self.theme_mode)
         if not self.has_seen_help:
             QTimer.singleShot(250, self.open_help_manual_first_run)
+        QTimer.singleShot(900, self.check_for_updates)
 
     def refresh_articles(self) -> None:
         rows = list_articles(
@@ -754,6 +796,33 @@ class MainWindow(QMainWindow):
                     has_seen_help=True,
                 )
             )
+
+    def check_for_updates(self) -> None:
+        if self._update_check_done:
+            return
+        self._update_check_done = True
+        latest = fetch_latest_github_release()
+        if not latest:
+            return
+        latest_tag = str(latest.get("tag_name") or "").strip()
+        if not latest_tag:
+            return
+        if not is_newer_version(__version__, latest_tag):
+            return
+        message = (
+            f"Installed version: {__version__}\n"
+            f"Latest version: {latest_tag}\n\n"
+            "A newer ADM version is available."
+        )
+        answer = QMessageBox.question(
+            self,
+            "Update available",
+            message + "\n\nOpen releases page now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            open_file(RELEASES_URL)
 
 
 def apply_app_theme(theme_mode: str) -> None:
