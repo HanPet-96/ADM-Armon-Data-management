@@ -14,7 +14,7 @@ call "!PY_EXE!" --version >nul 2>nul
 if errorlevel 1 (
   echo [ERROR] Python executable not found.
   echo [ERROR] Checked: .venv, ..\.venv, and PATH>> "!LOG_FILE!"
-  pause
+  if not defined ADM_NO_PAUSE pause
   exit /b 1
 )
 
@@ -37,7 +37,7 @@ if errorlevel 1 (
   echo [ERROR] Failed to install build dependencies.
   echo [ERROR] Failed to install build dependencies. See: !LOG_FILE!
   type "!LOG_FILE!"
-  pause
+  if not defined ADM_NO_PAUSE pause
   exit /b 1
 )
 
@@ -53,7 +53,7 @@ if errorlevel 1 (
   echo.
   echo Tip: run this from a normal non-admin terminal/session.
   type "!LOG_FILE!"
-  pause
+  if not defined ADM_NO_PAUSE pause
   exit /b 1
 )
 
@@ -87,7 +87,7 @@ if not exist "!FINAL_EXE!" (
   echo [ERROR] Build finished but ADM.exe not found in output.
   echo [ERROR] Missing output executable>> "!LOG_FILE!"
   echo See log: !LOG_FILE!
-  pause
+  if not defined ADM_NO_PAUSE pause
   exit /b 1
 )
 if not exist "!FINAL_DIST!\README_EXE_GEBRUIK.pdf" (
@@ -99,5 +99,5 @@ echo Output: !FINAL_EXE!
 echo [OK] Build complete>> "!LOG_FILE!"
 echo Log: !LOG_FILE!
 echo Done.
-pause
+if not defined ADM_NO_PAUSE pause
 exit /b 0

@@ -2055,9 +2055,6 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\.venv\\Lib\\site-packages\\PySide6\\Qt3DAnimation.pyd',
    'EXTENSION'),
-  ('_sqlite3.pyd',
-   'C:\\Program Files\\Python314\\DLLs\\_sqlite3.pyd',
-   'EXTENSION'),
   ('PIL\\_webp.cp314-win_amd64.pyd',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
@@ -2088,11 +2085,11 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\.venv\\Lib\\site-packages\\PIL\\_imaging.cp314-win_amd64.pyd',
    'EXTENSION'),
+  ('_sqlite3.pyd',
+   'C:\\Program Files\\Python314\\DLLs\\_sqlite3.pyd',
+   'EXTENSION'),
   ('VCRUNTIME140.dll',
    'C:\\Program Files\\Python314\\VCRUNTIME140.dll',
-   'BINARY'),
-  ('VCRUNTIME140_1.dll',
-   'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
    'BINARY'),
   ('shiboken6\\MSVCP140_2.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
@@ -2103,6 +2100,9 @@
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\.venv\\Lib\\site-packages\\shiboken6\\MSVCP140.dll',
+   'BINARY'),
+  ('VCRUNTIME140_1.dll',
+   'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
    'BINARY'),
   ('python3.dll', 'C:\\Program Files\\Python314\\python3.dll', 'BINARY'),
   ('shiboken6\\shiboken6.abi3.dll',

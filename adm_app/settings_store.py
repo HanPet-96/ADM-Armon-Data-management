@@ -11,6 +11,7 @@ class AppSettings:
     data_root: str
     theme_mode: str = "light"
     has_seen_help: bool = False
+    language: str = "en"
 
 
 def app_data_dir() -> Path:
@@ -43,18 +44,23 @@ def load_settings(default_data_root: Path, settings_path: Path | None = None) ->
         if theme_mode not in {"light", "dark"}:
             theme_mode = "light"
         has_seen_help = bool(payload.get("has_seen_help", False))
-        return AppSettings(data_root=data_root, theme_mode=theme_mode, has_seen_help=has_seen_help)
+        language = str(payload.get("language", "en")).lower()
+        if language not in {"en", "nl"}:
+            language = "en"
+        return AppSettings(data_root=data_root, theme_mode=theme_mode, has_seen_help=has_seen_help, language=language)
     except Exception:
-        return AppSettings(data_root=str(default_data_root), theme_mode="light", has_seen_help=False)
+        return AppSettings(data_root=str(default_data_root), theme_mode="light", has_seen_help=False, language="en")
 
 
 def save_settings(settings: AppSettings, settings_path: Path | None = None) -> None:
     path = settings_path or default_settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     theme_mode = settings.theme_mode if settings.theme_mode in {"light", "dark"} else "light"
+    language = settings.language if settings.language in {"en", "nl"} else "en"
     payload = {
         "data_root": settings.data_root,
         "theme_mode": theme_mode,
         "has_seen_help": bool(settings.has_seen_help),
+        "language": language,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

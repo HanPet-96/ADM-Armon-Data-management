@@ -55,6 +55,7 @@ def main() -> int:
                 data_root=str(data_root),
                 theme_mode=settings.theme_mode,
                 has_seen_help=settings.has_seen_help,
+                language=settings.language,
             )
         )
     db_path = Path(args.db_path).resolve() if args.db_path else default_db_path()
@@ -73,6 +74,7 @@ def main() -> int:
         data_root=str(data_root),
         theme_mode=settings.theme_mode,
         has_seen_help=settings.has_seen_help,
+        language=settings.language,
     )
 
 

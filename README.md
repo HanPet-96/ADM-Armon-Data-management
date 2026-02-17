@@ -8,7 +8,6 @@ Current app version: `1.0.0.1`
 - Import BOM Excel (`.xls`, `.xlsx`) into local SQLite
 - Search articles and inspect BOM lines
 - Link part documents (PDF/STEP/...) via filename heuristics with revision awareness
-- Show assembly tree (parent-child subassemblies)
 - Read-only UI (no source file edits)
 
 ## Expected data structure
@@ -84,17 +83,25 @@ Build dependencies are installed from:
 
 ## UI highlights
 - Article list with search
-- Animated toggle to show/hide subassemblies in article list/search
-- Assembly tree linked to selected article (root-expanded)
 - BOM table columns:
-  - `Part NR`, `Rev`, `Description`, `Material`, `Finish`, `Qty`, `Type`, `Status`
+  - now shown as expandable BOM tree by `Item No.`
+  - `Item`, `Part NR`, `Rev`, `Description`, `Material`, `Finish`, `Qty`, `Type`, `Status`
 - Status coloring:
   - `Approved` / `Released`: green
   - `Denied`: red
   - other/empty: orange
 - Linked documents + PDF preview pane
+- Order workflow:
+  - `Add to order` from selected BOM item
+  - Optional include of selected subtree (children)
+  - Assembly quantity multiplier
+  - Sub-BOM references are exploded recursively to leaf parts in order list
+  - Double-click on sub-BOM reference opens that referenced BOM
+  - `Order list` right-side slide-in panel with `Part NR`, `Rev`, `Qty`
+  - Export `XLSX + ZIP` with linked docs for supplier handoff
 - `Settings` dialog with folder picker for `Datastruct`
 - `Settings` dialog includes `Theme` selector (`light` / `dark`)
+- `Settings` dialog includes UI language selector (`English` / `Nederlands`)
 - `?` help button opens `README_EXE_GEBRUIK.pdf`
 - On first run, the user guide PDF opens automatically once
 
@@ -103,16 +110,13 @@ Build dependencies are installed from:
 - Commit from `Script` as repo root, or copy `Script` content into your repo root.
 
 ## Release flow (v1.0.0.1 and later)
-1. Prepare version files:
-   - `.\release_prepare.bat 1.0.0.1`
-   - If you omit the argument, default is `1.0.0.1`.
+1. Run one-click release script:
+   - `.\release_one_click.bat 1.0.0.1`
 2. Commit + push with GitHub Desktop (or git CLI).
-3. Build portable app:
-   - `.\build_adm.bat`
-4. Zip folder:
-   - `dist\ADM_portable`
-5. Create GitHub Release with tag:
+3. Create GitHub Release with tag:
    - `v1.0.0.1`
+4. Upload asset:
+   - `dist\ADM_v1.0.0.1_portable.zip`
 
 ## Automatic update check
 - On startup, ADM checks GitHub `latest release` for this repo:

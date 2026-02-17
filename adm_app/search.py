@@ -6,22 +6,11 @@ import sqlite3
 def list_articles(
     conn: sqlite3.Connection, query: str = "", limit: int = 500, top_level_only: bool = False
 ) -> list[sqlite3.Row]:
-    top_level_filter = """
-        NOT EXISTS (
-            SELECT 1
-            FROM parts p2
-            JOIN bom_lines bl2 ON bl2.part_id = p2.id
-            WHERE p2.part_number = a.article_number
-        )
-    """
+    _ = top_level_only  # retained for backward compatibility in callers
     if query.strip():
         q = f"%{query.strip()}%"
-        where_clauses = [
-            "(a.article_number LIKE ? OR COALESCE(a.title, '') LIKE ? OR COALESCE(p.part_number, '') LIKE ? OR COALESCE(p.description, '') LIKE ?)"
-        ]
+        where_clauses = ["(a.article_number LIKE ? OR COALESCE(a.title, '') LIKE ? OR COALESCE(p.part_number, '') LIKE ? OR COALESCE(p.description, '') LIKE ?)"]
         params: list[object] = [q, q, q, q]
-        if top_level_only:
-            where_clauses.append(top_level_filter)
         where_sql = " AND ".join(where_clauses)
         params.append(limit)
         return conn.execute(
@@ -44,15 +33,11 @@ def list_articles(
             """,
             params,
         ).fetchall()
-    where_sql = f"WHERE {top_level_filter}" if top_level_only else ""
     return conn.execute(
         """
         SELECT a.id, a.article_number, a.title, COUNT(bl.id) AS bom_line_count
         FROM articles a
         LEFT JOIN bom_lines bl ON bl.article_id = a.id
-        """
-        + where_sql
-        + """
         GROUP BY a.id, a.article_number, a.title
         ORDER BY a.article_number
         LIMIT ?
@@ -69,12 +54,25 @@ def get_article_by_number(conn: sqlite3.Connection, article_number: str) -> sqli
     return conn.execute("SELECT * FROM articles WHERE article_number=?", (article_number,)).fetchone()
 
 
+def get_article_ids_by_numbers(conn: sqlite3.Connection, article_numbers: list[str]) -> dict[str, int]:
+    normalized = [str(n).strip() for n in article_numbers if str(n).strip()]
+    if not normalized:
+        return {}
+    placeholders = ",".join(["?"] * len(normalized))
+    rows = conn.execute(
+        f"SELECT id, article_number FROM articles WHERE article_number IN ({placeholders})",
+        normalized,
+    ).fetchall()
+    return {str(row["article_number"]): int(row["id"]) for row in rows}
+
+
 def get_article_bom_lines(conn: sqlite3.Connection, article_id: int) -> list[sqlite3.Row]:
-    return conn.execute(
+    rows = conn.execute(
         """
         SELECT
             bl.id,
             bl.part_id,
+            bl.item_no,
             bl.line_no,
             p.part_number,
             COALESCE(bl.description, p.description) AS description,
@@ -88,10 +86,26 @@ def get_article_bom_lines(conn: sqlite3.Connection, article_id: int) -> list[sql
         FROM bom_lines bl
         JOIN parts p ON p.id = bl.part_id
         WHERE bl.article_id=?
-        ORDER BY COALESCE(bl.line_no, 999999), p.part_number
         """,
         (article_id,),
     ).fetchall()
+    return sorted(rows, key=bom_line_sort_key)
+
+
+def bom_line_sort_key(row: sqlite3.Row) -> tuple:
+    item_no = str(row["item_no"] or "").strip()
+    if item_no:
+        parts: list[tuple[int, int | str]] = []
+        for token in item_no.split("."):
+            if token.isdigit():
+                parts.append((0, int(token)))
+            else:
+                parts.append((1, token))
+        return (0, tuple(parts), str(row["part_number"] or ""))
+    line_no = row["line_no"]
+    if line_no is not None:
+        return (1, ((0, int(line_no)),), str(row["part_number"] or ""))
+    return (2, tuple(), str(row["part_number"] or ""))
 
 
 def get_documents_for_link(conn: sqlite3.Connection, linked_to_type: str, linked_id: int) -> list[sqlite3.Row]:
@@ -124,45 +138,6 @@ def get_part_usages(conn: sqlite3.Connection, part_id: int) -> list[sqlite3.Row]
         ORDER BY a.article_number
         """,
         (part_id,),
-    ).fetchall()
-
-
-def get_child_articles(conn: sqlite3.Connection, parent_article_id: int) -> list[sqlite3.Row]:
-    return conn.execute(
-        """
-        SELECT
-            child.id AS child_article_id,
-            child.article_number,
-            child.title,
-            SUM(COALESCE(bl.qty, 1)) AS qty_total
-        FROM bom_lines bl
-        JOIN parts p ON p.id = bl.part_id
-        JOIN articles child ON child.article_number = p.part_number
-        WHERE bl.article_id=?
-        GROUP BY child.id, child.article_number, child.title
-        ORDER BY child.article_number
-        """,
-        (parent_article_id,),
-    ).fetchall()
-
-
-def get_parent_articles(conn: sqlite3.Connection, child_article_id: int) -> list[sqlite3.Row]:
-    return conn.execute(
-        """
-        SELECT
-            parent.id AS parent_article_id,
-            parent.article_number,
-            parent.title,
-            SUM(COALESCE(bl.qty, 1)) AS qty_total
-        FROM articles child
-        JOIN parts p ON p.part_number = child.article_number
-        JOIN bom_lines bl ON bl.part_id = p.id
-        JOIN articles parent ON parent.id = bl.article_id
-        WHERE child.id=?
-        GROUP BY parent.id, parent.article_number, parent.title
-        ORDER BY parent.article_number
-        """,
-        (child_article_id,),
     ).fetchall()
 
 

@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS bom_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     article_id INTEGER NOT NULL,
     part_id INTEGER NOT NULL,
+    item_no TEXT,
     line_no INTEGER,
     qty REAL,
     unit TEXT,
@@ -114,6 +115,8 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 def ensure_bom_lines_columns(conn: sqlite3.Connection) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(bom_lines)").fetchall()}
+    if "item_no" not in columns:
+        conn.execute("ALTER TABLE bom_lines ADD COLUMN item_no TEXT")
     if "finish" not in columns:
         conn.execute("ALTER TABLE bom_lines ADD COLUMN finish TEXT")
     if "line_type" not in columns:
@@ -224,6 +227,7 @@ def insert_bom_line(
     conn: sqlite3.Connection,
     article_id: int,
     part_id: int,
+    item_no: str | None,
     line_no: int | None,
     qty: float | None,
     unit: str | None,
@@ -241,13 +245,14 @@ def insert_bom_line(
     conn.execute(
         """
         INSERT INTO bom_lines(
-            article_id, part_id, line_no, qty, unit, revision, description, material,
+            article_id, part_id, item_no, line_no, qty, unit, revision, description, material,
             finish, line_type, status, raw_columns_json, source_sheet, source_row_number, import_run_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             article_id,
             part_id,
+            item_no,
             line_no,
             qty,
             unit,

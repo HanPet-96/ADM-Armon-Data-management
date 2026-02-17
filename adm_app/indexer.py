@@ -19,7 +19,6 @@ from .db import (
 from .excel_parser import parse_bom_file
 
 
-ARTICLE_REGEX = re.compile(r"\b(\d{4,})\b")
 PART_REGEX = re.compile(r"\b([A-Z]{0,4}\d{3,}[A-Z0-9\-]*)\b", re.IGNORECASE)
 DOC_PART_PATTERN = re.compile(r"(?<!\d)(\d{2}-\d{5,6})(?!\d)", re.IGNORECASE)
 DOC_EXT_TO_TYPE = {
@@ -78,6 +77,7 @@ def run_index(conn: sqlite3.Connection, data_root: Path) -> IndexStats:
                         conn=conn,
                         article_id=article_id,
                         part_id=part_id,
+                        item_no=line.item_no,
                         line_no=line.line_no,
                         qty=line.qty,
                         unit=line.unit,
@@ -105,6 +105,7 @@ def run_index(conn: sqlite3.Connection, data_root: Path) -> IndexStats:
                     file_path=str(bom_file),
                 )
                 conn.commit()
+        remove_missing_articles(conn, boms_root=boms_path.resolve())
         index_documents(conn, data_root, run_id)
         status = "completed_with_warnings" if stats.warnings_count or stats.errors_count else "completed"
         finish_import_run(
@@ -126,6 +127,8 @@ def run_index(conn: sqlite3.Connection, data_root: Path) -> IndexStats:
 
 def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> None:
     doc_folders = ["PDF", "STEP", "SOP", "OVERIG"]
+    managed_roots = [(data_root / folder).resolve() for folder in doc_folders]
+    seen_paths: set[str] = set()
     for folder in doc_folders:
         folder_path = data_root / folder
         if not folder_path.exists():
@@ -133,22 +136,18 @@ def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> N
         for file in folder_path.rglob("*"):
             if not file.is_file():
                 continue
+            resolved_file = str(file.resolve())
+            seen_paths.add(resolved_file.casefold())
             stat = file.stat()
-            article_id = find_article_id_from_name(conn, file.name)
             part_id = None
             part_revision = None
             link_reason = None
-            if article_id is None:
-                part_id, part_revision, link_reason = find_part_match_with_revision(conn, file.name)
-            if part_id is None and article_id is None:
+            part_id, part_revision, link_reason = find_part_match_with_revision(conn, file.name)
+            if part_id is None:
                 part_id = find_part_id_from_name(conn, file.name)
                 if part_id is not None:
                     link_reason = "matched_part_fallback"
-            if article_id is not None:
-                linked_to_type = "article"
-                linked_id = article_id
-                link_reason = "matched_article_number"
-            elif part_id is not None:
+            if part_id is not None:
                 linked_to_type = "part"
                 linked_id = part_id
             else:
@@ -158,7 +157,7 @@ def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> N
                     link_reason = classify_unmatched_reason(conn, file.name)
             upsert_document(
                 conn=conn,
-                path=str(file),
+                path=resolved_file,
                 filename=file.name,
                 extension=file.suffix.lower(),
                 size_bytes=stat.st_size,
@@ -170,15 +169,50 @@ def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> N
                 part_revision=part_revision,
                 link_reason=link_reason,
             )
+    remove_missing_documents(conn, managed_roots=managed_roots, seen_paths=seen_paths)
     conn.commit()
 
 
-def find_article_id_from_name(conn: sqlite3.Connection, filename: str) -> int | None:
-    match = ARTICLE_REGEX.search(filename)
-    if not match:
-        return None
-    row = conn.execute("SELECT id FROM articles WHERE article_number=?", (match.group(1),)).fetchone()
-    return int(row["id"]) if row else None
+def remove_missing_articles(conn: sqlite3.Connection, boms_root: Path) -> None:
+    rows = conn.execute("SELECT id, source_bom_path FROM articles").fetchall()
+    for row in rows:
+        article_id = int(row["id"])
+        raw_path = str(row["source_bom_path"] or "").strip()
+        if not raw_path:
+            continue
+        bom_path = Path(raw_path).resolve()
+        if not is_path_within(bom_path, boms_root):
+            continue
+        if bom_path.exists():
+            continue
+        conn.execute("DELETE FROM bom_lines WHERE article_id=?", (article_id,))
+        conn.execute(
+            "DELETE FROM documents WHERE linked_to_type='article' AND linked_id=?",
+            (article_id,),
+        )
+        conn.execute("DELETE FROM articles WHERE id=?", (article_id,))
+
+
+def remove_missing_documents(conn: sqlite3.Connection, managed_roots: list[Path], seen_paths: set[str]) -> None:
+    rows = conn.execute("SELECT id, path FROM documents").fetchall()
+    for row in rows:
+        raw_path = str(row["path"] or "").strip()
+        if not raw_path:
+            continue
+        doc_path = Path(raw_path).resolve()
+        if not any(is_path_within(doc_path, root) for root in managed_roots):
+            continue
+        if str(doc_path).casefold() in seen_paths:
+            continue
+        conn.execute("DELETE FROM documents WHERE id=?", (int(row["id"]),))
+
+
+def is_path_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
 
 
 def find_part_id_from_name(conn: sqlite3.Connection, filename: str) -> int | None:

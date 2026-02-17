@@ -26,6 +26,7 @@ class ParsedLine:
     line_type: str | None
     status: str | None
     unit: str | None
+    item_no: str | None
     line_no: int | None
     raw_columns: dict[str, object]
     source_sheet: str
@@ -107,6 +108,7 @@ def parse_sheet_rows(sheet_name: str, rows: list[list[object]]) -> list[ParsedLi
                 line_type=to_text(read_cell(row, header_map, "line_type")),
                 status=to_text(read_cell(row, header_map, "status")),
                 unit=to_text(read_cell(row, header_map, "unit")),
+                item_no=to_item_no(read_cell(row, header_map, "line_no")),
                 line_no=to_int(read_cell(row, header_map, "line_no")),
                 raw_columns=raw_columns,
                 source_sheet=sheet_name,
@@ -150,7 +152,35 @@ def to_text(value: object | None) -> str | None:
 def to_int(value: object | None) -> int | None:
     if value is None:
         return None
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    if "." in text and not text.endswith(".0"):
+        return None
     try:
-        return int(float(value))
+        parsed = float(text)
+        if not parsed.is_integer():
+            return None
+        return int(parsed)
     except (ValueError, TypeError):
         return None
+
+
+def to_item_no(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, float):
+        if value.is_integer():
+            return str(int(value))
+        text = f"{value:.12g}"
+        return text.rstrip(".")
+    text = str(value).strip()
+    if not text:
+        return None
+    text = text.replace(" ", "")
+    text = re.sub(r"\.+", ".", text).strip(".")
+    return text or None

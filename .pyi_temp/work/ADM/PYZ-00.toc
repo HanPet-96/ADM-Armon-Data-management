@@ -566,6 +566,11 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\excel_parser.py',
    'PYMODULE'),
+  ('adm_app.i18n',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\i18n.py',
+   'PYMODULE'),
   ('adm_app.indexer',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '

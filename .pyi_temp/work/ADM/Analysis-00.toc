@@ -20090,6 +20090,9 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\.venv\\Lib\\site-packages\\PySide6\\__init__.py',
    'PYMODULE'),
+  ('stringprep',
+   'C:\\Program Files\\Python314\\Lib\\stringprep.py',
+   'PYMODULE'),
   ('codeop', 'C:\\Program Files\\Python314\\Lib\\codeop.py', 'PYMODULE'),
   ('_py_warnings',
    'C:\\Program Files\\Python314\\Lib\\_py_warnings.py',
@@ -20098,9 +20101,6 @@
    'C:\\Program Files\\Python314\\Lib\\tracemalloc.py',
    'PYMODULE'),
   ('_py_abc', 'C:\\Program Files\\Python314\\Lib\\_py_abc.py', 'PYMODULE'),
-  ('stringprep',
-   'C:\\Program Files\\Python314\\Lib\\stringprep.py',
-   'PYMODULE'),
   ('adm_app.__main__',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
@@ -20126,88 +20126,10 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\search.py',
    'PYMODULE'),
-  ('sqlite3',
-   'C:\\Program Files\\Python314\\Lib\\sqlite3\\__init__.py',
-   'PYMODULE'),
-  ('sqlite3.dump',
-   'C:\\Program Files\\Python314\\Lib\\sqlite3\\dump.py',
-   'PYMODULE'),
-  ('sqlite3.__main__',
-   'C:\\Program Files\\Python314\\Lib\\sqlite3\\__main__.py',
-   'PYMODULE'),
-  ('code', 'C:\\Program Files\\Python314\\Lib\\code.py', 'PYMODULE'),
-  ('sqlite3.dbapi2',
-   'C:\\Program Files\\Python314\\Lib\\sqlite3\\dbapi2.py',
-   'PYMODULE'),
-  ('adm_app.settings_store',
+  ('adm_app.i18n',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\settings_store.py',
-   'PYMODULE'),
-  ('adm_app.indexer',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\indexer.py',
-   'PYMODULE'),
-  ('adm_app.excel_parser',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\excel_parser.py',
-   'PYMODULE'),
-  ('adm_app.mapping',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\mapping.py',
-   'PYMODULE'),
-  ('xlrd',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\__init__.py',
-   'PYMODULE'),
-  ('xlrd.xldate',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\xldate.py',
-   'PYMODULE'),
-  ('xlrd.info',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\info.py',
-   'PYMODULE'),
-  ('xlrd.formula',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\formula.py',
-   'PYMODULE'),
-  ('xlrd.book',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\book.py',
-   'PYMODULE'),
-  ('xlrd.sheet',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\sheet.py',
-   'PYMODULE'),
-  ('xlrd.formatting',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\formatting.py',
-   'PYMODULE'),
-  ('xlrd.compdoc',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\compdoc.py',
-   'PYMODULE'),
-  ('xlrd.biffh',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\biffh.py',
-   'PYMODULE'),
-  ('xlrd.timemachine',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\timemachine.py',
+   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\i18n.py',
    'PYMODULE'),
   ('openpyxl',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
@@ -21485,6 +21407,89 @@
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\.venv\\Lib\\site-packages\\openpyxl\\compat\\numbers.py',
+   'PYMODULE'),
+  ('sqlite3',
+   'C:\\Program Files\\Python314\\Lib\\sqlite3\\__init__.py',
+   'PYMODULE'),
+  ('sqlite3.dump',
+   'C:\\Program Files\\Python314\\Lib\\sqlite3\\dump.py',
+   'PYMODULE'),
+  ('sqlite3.__main__',
+   'C:\\Program Files\\Python314\\Lib\\sqlite3\\__main__.py',
+   'PYMODULE'),
+  ('code', 'C:\\Program Files\\Python314\\Lib\\code.py', 'PYMODULE'),
+  ('sqlite3.dbapi2',
+   'C:\\Program Files\\Python314\\Lib\\sqlite3\\dbapi2.py',
+   'PYMODULE'),
+  ('adm_app.settings_store',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\settings_store.py',
+   'PYMODULE'),
+  ('adm_app.indexer',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\indexer.py',
+   'PYMODULE'),
+  ('adm_app.excel_parser',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\excel_parser.py',
+   'PYMODULE'),
+  ('adm_app.mapping',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\adm_app\\mapping.py',
+   'PYMODULE'),
+  ('xlrd',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\__init__.py',
+   'PYMODULE'),
+  ('xlrd.xldate',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\xldate.py',
+   'PYMODULE'),
+  ('xlrd.info',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\info.py',
+   'PYMODULE'),
+  ('xlrd.formula',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\formula.py',
+   'PYMODULE'),
+  ('xlrd.book',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\book.py',
+   'PYMODULE'),
+  ('xlrd.sheet',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\sheet.py',
+   'PYMODULE'),
+  ('xlrd.formatting',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\formatting.py',
+   'PYMODULE'),
+  ('xlrd.compdoc',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\compdoc.py',
+   'PYMODULE'),
+  ('xlrd.biffh',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\biffh.py',
+   'PYMODULE'),
+  ('xlrd.timemachine',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\.venv\\Lib\\site-packages\\xlrd\\timemachine.py',
    'PYMODULE'),
   ('adm_app.db',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
@@ -23543,9 +23548,6 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\.venv\\Lib\\site-packages\\PySide6\\Qt3DAnimation.pyd',
    'EXTENSION'),
-  ('_sqlite3.pyd',
-   'C:\\Program Files\\Python314\\DLLs\\_sqlite3.pyd',
-   'EXTENSION'),
   ('PIL\\_webp.cp314-win_amd64.pyd',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
@@ -23576,11 +23578,11 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\.venv\\Lib\\site-packages\\PIL\\_imaging.cp314-win_amd64.pyd',
    'EXTENSION'),
+  ('_sqlite3.pyd',
+   'C:\\Program Files\\Python314\\DLLs\\_sqlite3.pyd',
+   'EXTENSION'),
   ('VCRUNTIME140.dll',
    'C:\\Program Files\\Python314\\VCRUNTIME140.dll',
-   'BINARY'),
-  ('VCRUNTIME140_1.dll',
-   'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
    'BINARY'),
   ('shiboken6\\MSVCP140_2.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
@@ -23591,6 +23593,9 @@
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\.venv\\Lib\\site-packages\\shiboken6\\MSVCP140.dll',
+   'BINARY'),
+  ('VCRUNTIME140_1.dll',
+   'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
    'BINARY'),
   ('python3.dll', 'C:\\Program Files\\Python314\\python3.dll', 'BINARY'),
   ('shiboken6\\shiboken6.abi3.dll',
@@ -39545,59 +39550,7 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.pyi_temp\\work\\ADM\\base_library.zip',
    'DATA')],
- [('io', 'C:\\Program Files\\Python314\\Lib\\io.py', 'PYMODULE'),
-  ('collections',
-   'C:\\Program Files\\Python314\\Lib\\collections\\__init__.py',
-   'PYMODULE'),
-  ('copyreg', 'C:\\Program Files\\Python314\\Lib\\copyreg.py', 'PYMODULE'),
-  ('sre_parse', 'C:\\Program Files\\Python314\\Lib\\sre_parse.py', 'PYMODULE'),
-  ('posixpath', 'C:\\Program Files\\Python314\\Lib\\posixpath.py', 'PYMODULE'),
-  ('functools', 'C:\\Program Files\\Python314\\Lib\\functools.py', 'PYMODULE'),
-  ('os', 'C:\\Program Files\\Python314\\Lib\\os.py', 'PYMODULE'),
-  ('_weakrefset',
-   'C:\\Program Files\\Python314\\Lib\\_weakrefset.py',
-   'PYMODULE'),
-  ('sre_constants',
-   'C:\\Program Files\\Python314\\Lib\\sre_constants.py',
-   'PYMODULE'),
-  ('operator', 'C:\\Program Files\\Python314\\Lib\\operator.py', 'PYMODULE'),
-  ('linecache', 'C:\\Program Files\\Python314\\Lib\\linecache.py', 'PYMODULE'),
-  ('traceback', 'C:\\Program Files\\Python314\\Lib\\traceback.py', 'PYMODULE'),
-  ('reprlib', 'C:\\Program Files\\Python314\\Lib\\reprlib.py', 'PYMODULE'),
-  ('ntpath', 'C:\\Program Files\\Python314\\Lib\\ntpath.py', 'PYMODULE'),
-  ('locale', 'C:\\Program Files\\Python314\\Lib\\locale.py', 'PYMODULE'),
-  ('stat', 'C:\\Program Files\\Python314\\Lib\\stat.py', 'PYMODULE'),
-  ('types', 'C:\\Program Files\\Python314\\Lib\\types.py', 'PYMODULE'),
-  ('sre_compile',
-   'C:\\Program Files\\Python314\\Lib\\sre_compile.py',
-   'PYMODULE'),
-  ('codecs', 'C:\\Program Files\\Python314\\Lib\\codecs.py', 'PYMODULE'),
-  ('genericpath',
-   'C:\\Program Files\\Python314\\Lib\\genericpath.py',
-   'PYMODULE'),
-  ('_collections_abc',
-   'C:\\Program Files\\Python314\\Lib\\_collections_abc.py',
-   'PYMODULE'),
-  ('enum', 'C:\\Program Files\\Python314\\Lib\\enum.py', 'PYMODULE'),
-  ('warnings', 'C:\\Program Files\\Python314\\Lib\\warnings.py', 'PYMODULE'),
-  ('re._parser',
-   'C:\\Program Files\\Python314\\Lib\\re\\_parser.py',
-   'PYMODULE'),
-  ('re._constants',
-   'C:\\Program Files\\Python314\\Lib\\re\\_constants.py',
-   'PYMODULE'),
-  ('re._compiler',
-   'C:\\Program Files\\Python314\\Lib\\re\\_compiler.py',
-   'PYMODULE'),
-  ('re._casefix',
-   'C:\\Program Files\\Python314\\Lib\\re\\_casefix.py',
-   'PYMODULE'),
-  ('re', 'C:\\Program Files\\Python314\\Lib\\re\\__init__.py', 'PYMODULE'),
-  ('weakref', 'C:\\Program Files\\Python314\\Lib\\weakref.py', 'PYMODULE'),
-  ('keyword', 'C:\\Program Files\\Python314\\Lib\\keyword.py', 'PYMODULE'),
-  ('heapq', 'C:\\Program Files\\Python314\\Lib\\heapq.py', 'PYMODULE'),
-  ('abc', 'C:\\Program Files\\Python314\\Lib\\abc.py', 'PYMODULE'),
-  ('encodings.zlib_codec',
+ [('encodings.zlib_codec',
    'C:\\Program Files\\Python314\\Lib\\encodings\\zlib_codec.py',
    'PYMODULE'),
   ('encodings.uu_codec',
@@ -39965,4 +39918,56 @@
    'PYMODULE'),
   ('encodings',
    'C:\\Program Files\\Python314\\Lib\\encodings\\__init__.py',
-   'PYMODULE')])
+   'PYMODULE'),
+  ('collections',
+   'C:\\Program Files\\Python314\\Lib\\collections\\__init__.py',
+   'PYMODULE'),
+  ('traceback', 'C:\\Program Files\\Python314\\Lib\\traceback.py', 'PYMODULE'),
+  ('enum', 'C:\\Program Files\\Python314\\Lib\\enum.py', 'PYMODULE'),
+  ('copyreg', 'C:\\Program Files\\Python314\\Lib\\copyreg.py', 'PYMODULE'),
+  ('ntpath', 'C:\\Program Files\\Python314\\Lib\\ntpath.py', 'PYMODULE'),
+  ('stat', 'C:\\Program Files\\Python314\\Lib\\stat.py', 'PYMODULE'),
+  ('_collections_abc',
+   'C:\\Program Files\\Python314\\Lib\\_collections_abc.py',
+   'PYMODULE'),
+  ('linecache', 'C:\\Program Files\\Python314\\Lib\\linecache.py', 'PYMODULE'),
+  ('heapq', 'C:\\Program Files\\Python314\\Lib\\heapq.py', 'PYMODULE'),
+  ('codecs', 'C:\\Program Files\\Python314\\Lib\\codecs.py', 'PYMODULE'),
+  ('os', 'C:\\Program Files\\Python314\\Lib\\os.py', 'PYMODULE'),
+  ('types', 'C:\\Program Files\\Python314\\Lib\\types.py', 'PYMODULE'),
+  ('sre_compile',
+   'C:\\Program Files\\Python314\\Lib\\sre_compile.py',
+   'PYMODULE'),
+  ('_weakrefset',
+   'C:\\Program Files\\Python314\\Lib\\_weakrefset.py',
+   'PYMODULE'),
+  ('locale', 'C:\\Program Files\\Python314\\Lib\\locale.py', 'PYMODULE'),
+  ('warnings', 'C:\\Program Files\\Python314\\Lib\\warnings.py', 'PYMODULE'),
+  ('genericpath',
+   'C:\\Program Files\\Python314\\Lib\\genericpath.py',
+   'PYMODULE'),
+  ('io', 'C:\\Program Files\\Python314\\Lib\\io.py', 'PYMODULE'),
+  ('sre_constants',
+   'C:\\Program Files\\Python314\\Lib\\sre_constants.py',
+   'PYMODULE'),
+  ('abc', 'C:\\Program Files\\Python314\\Lib\\abc.py', 'PYMODULE'),
+  ('functools', 'C:\\Program Files\\Python314\\Lib\\functools.py', 'PYMODULE'),
+  ('sre_parse', 'C:\\Program Files\\Python314\\Lib\\sre_parse.py', 'PYMODULE'),
+  ('re._parser',
+   'C:\\Program Files\\Python314\\Lib\\re\\_parser.py',
+   'PYMODULE'),
+  ('re._constants',
+   'C:\\Program Files\\Python314\\Lib\\re\\_constants.py',
+   'PYMODULE'),
+  ('re._compiler',
+   'C:\\Program Files\\Python314\\Lib\\re\\_compiler.py',
+   'PYMODULE'),
+  ('re._casefix',
+   'C:\\Program Files\\Python314\\Lib\\re\\_casefix.py',
+   'PYMODULE'),
+  ('re', 'C:\\Program Files\\Python314\\Lib\\re\\__init__.py', 'PYMODULE'),
+  ('reprlib', 'C:\\Program Files\\Python314\\Lib\\reprlib.py', 'PYMODULE'),
+  ('keyword', 'C:\\Program Files\\Python314\\Lib\\keyword.py', 'PYMODULE'),
+  ('posixpath', 'C:\\Program Files\\Python314\\Lib\\posixpath.py', 'PYMODULE'),
+  ('operator', 'C:\\Program Files\\Python314\\Lib\\operator.py', 'PYMODULE'),
+  ('weakref', 'C:\\Program Files\\Python314\\Lib\\weakref.py', 'PYMODULE')])
