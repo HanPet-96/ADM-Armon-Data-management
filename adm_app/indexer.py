@@ -126,7 +126,7 @@ def run_index(conn: sqlite3.Connection, data_root: Path) -> IndexStats:
 
 
 def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> None:
-    doc_folders = ["PDF", "STEP", "SOP", "OVERIG"]
+    doc_folders = ["PDF", "STEP-DXF", "SOP", "OVERIG"]
     managed_roots = [(data_root / folder).resolve() for folder in doc_folders]
     seen_paths: set[str] = set()
     for folder in doc_folders:

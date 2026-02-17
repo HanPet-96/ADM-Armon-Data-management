@@ -20,7 +20,7 @@ De juiste datastruct folder staat in:
 Kies daar de map die de submappen bevat:
 - `BOMS`
 - `PDF`
-- `STEP`
+- `STEP-DXF`
 - `SOP`
 - `OVERIG`
 

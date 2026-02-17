@@ -4,10 +4,10 @@ Offline Windows desktop viewer for BOM-driven article and part traceability.
 Current app version: `1.0.0.4`
 
 ## Scope (current MVP)
-- Scan `Datastruct` folder structure (`BOMS`, `PDF`, `STEP`, `SOP`, `OVERIG`)
+- Scan `Datastruct` folder structure (`BOMS`, `PDF`, `STEP-DXF`, `SOP`, `OVERIG`)
 - Import BOM Excel (`.xls`, `.xlsx`) into local SQLite
 - Search articles and inspect BOM lines
-- Link part documents (PDF/STEP/...) via filename heuristics with revision awareness
+- Link part documents (PDF/STEP/DXF/...) via filename heuristics with revision awareness
 - Read-only UI (no source file edits)
 
 ## Expected data structure
@@ -15,7 +15,7 @@ Point the app to a `Datastruct` root containing:
 
 - `BOMS`
 - `PDF`
-- `STEP`
+- `STEP-DXF`
 - `SOP`
 - `OVERIG`
 
