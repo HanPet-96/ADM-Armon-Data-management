@@ -44,12 +44,30 @@ def run_index(conn: sqlite3.Connection, data_root: Path) -> IndexStats:
     run_id = start_import_run(conn)
     try:
         boms_path = data_root / "BOMS"
+        boms_changed = False
+        existing_by_path: dict[str, sqlite3.Row] = {}
+        for row in conn.execute(
+            "SELECT id, source_bom_path, source_bom_modified_at, source_bom_size_bytes FROM articles"
+        ).fetchall():
+            source_path = str(row["source_bom_path"] or "").strip()
+            if source_path:
+                existing_by_path[source_path.casefold()] = row
         bom_files = sorted(
             [*boms_path.rglob("*.xlsx"), *boms_path.rglob("*.xls"), *boms_path.rglob("*.xlsm")]
         )
         stats.files_scanned += len(bom_files)
         for bom_file in bom_files:
             try:
+                stat = bom_file.stat()
+                modified_at = datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="microseconds")
+                size_bytes = int(stat.st_size)
+                existing = existing_by_path.get(str(bom_file.resolve()).casefold())
+                if (
+                    existing is not None
+                    and str(existing["source_bom_modified_at"] or "") == modified_at
+                    and int(existing["source_bom_size_bytes"] or 0) == size_bytes
+                ):
+                    continue
                 parsed = parse_bom_file(bom_file)
                 article_id = upsert_article(
                     conn,
@@ -57,7 +75,10 @@ def run_index(conn: sqlite3.Connection, data_root: Path) -> IndexStats:
                     title=parsed.article_title,
                     source_bom_path=str(parsed.source_file),
                     source_bom_filename=parsed.source_file.name,
+                    source_bom_modified_at=modified_at,
+                    source_bom_size_bytes=size_bytes,
                 )
+                boms_changed = True
                 clear_article_lines_for_run(conn, article_id)
                 for line in parsed.lines:
                     if not line.part_number:
@@ -105,8 +126,9 @@ def run_index(conn: sqlite3.Connection, data_root: Path) -> IndexStats:
                     file_path=str(bom_file),
                 )
                 conn.commit()
-        remove_missing_articles(conn, boms_root=boms_path.resolve())
-        index_documents(conn, data_root, run_id)
+        removed_articles = remove_missing_articles(conn, boms_root=boms_path.resolve())
+        force_doc_relink = boms_changed or removed_articles > 0
+        index_documents(conn, data_root, run_id, force_relink=force_doc_relink)
         status = "completed_with_warnings" if stats.warnings_count or stats.errors_count else "completed"
         finish_import_run(
             conn,
@@ -125,10 +147,16 @@ def run_index(conn: sqlite3.Connection, data_root: Path) -> IndexStats:
         raise
 
 
-def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> None:
+def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int, force_relink: bool = False) -> None:
     doc_folders = ["PDF", "STEP-DXF", "SOP", "OVERIG"]
     managed_roots = [(data_root / folder).resolve() for folder in doc_folders]
     seen_paths: set[str] = set()
+    existing_by_path: dict[str, tuple[int, str]] = {}
+    for row in conn.execute("SELECT path, size_bytes, modified_at FROM documents").fetchall():
+        path = str(row["path"] or "").strip()
+        if not path:
+            continue
+        existing_by_path[path.casefold()] = (int(row["size_bytes"] or 0), str(row["modified_at"] or ""))
     for folder in doc_folders:
         folder_path = data_root / folder
         if not folder_path.exists():
@@ -139,6 +167,11 @@ def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> N
             resolved_file = str(file.resolve())
             seen_paths.add(resolved_file.casefold())
             stat = file.stat()
+            modified_at = datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="microseconds")
+            size_bytes = int(stat.st_size)
+            existing = existing_by_path.get(resolved_file.casefold())
+            if not force_relink and existing is not None and existing[0] == size_bytes and existing[1] == modified_at:
+                continue
             part_id = None
             part_revision = None
             link_reason = None
@@ -160,8 +193,8 @@ def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> N
                 path=resolved_file,
                 filename=file.name,
                 extension=file.suffix.lower(),
-                size_bytes=stat.st_size,
-                modified_at=datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+                size_bytes=size_bytes,
+                modified_at=modified_at,
                 run_id=run_id,
                 linked_to_type=linked_to_type,
                 linked_id=linked_id,
@@ -173,7 +206,8 @@ def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int) -> N
     conn.commit()
 
 
-def remove_missing_articles(conn: sqlite3.Connection, boms_root: Path) -> None:
+def remove_missing_articles(conn: sqlite3.Connection, boms_root: Path) -> int:
+    removed = 0
     rows = conn.execute("SELECT id, source_bom_path FROM articles").fetchall()
     for row in rows:
         article_id = int(row["id"])
@@ -191,6 +225,8 @@ def remove_missing_articles(conn: sqlite3.Connection, boms_root: Path) -> None:
             (article_id,),
         )
         conn.execute("DELETE FROM articles WHERE id=?", (article_id,))
+        removed += 1
+    return removed
 
 
 def remove_missing_documents(conn: sqlite3.Connection, managed_roots: list[Path], seen_paths: set[str]) -> None:
@@ -200,6 +236,11 @@ def remove_missing_documents(conn: sqlite3.Connection, managed_roots: list[Path]
         if not raw_path:
             continue
         doc_path = Path(raw_path).resolve()
+        # Always clean stale rows when the file no longer exists.
+        # This also removes legacy rows after folder renames (e.g. STEP -> STEP-DXF).
+        if not doc_path.exists():
+            conn.execute("DELETE FROM documents WHERE id=?", (int(row["id"]),))
+            continue
         if not any(is_path_within(doc_path, root) for root in managed_roots):
             continue
         if str(doc_path).casefold() in seen_paths:

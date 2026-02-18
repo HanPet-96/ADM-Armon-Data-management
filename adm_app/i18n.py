@@ -19,6 +19,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_expand_all": "Expand all",
         "btn_collapse_all": "Collapse all",
         "btn_add_to_order": "Add to order",
+        "btn_save_bom": "Save BOM",
+        "btn_revision_check": "Revision check",
         "lbl_select_article": "Select an article",
         "lbl_docs_article": "Linked documents (article)",
         "lbl_pdf_preview": "PDF preview",
@@ -41,12 +43,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "bom_col_status": "Status",
         "article_col_article": "Article",
         "article_col_title": "Title",
-        "article_col_bom_lines": "BOM lines",
         "settings_title": "Settings",
         "settings_datastruct": "Datastruct folder",
         "settings_browse": "Browse...",
         "settings_dark_mode": "Dark mode",
         "settings_language": "Language",
+        "settings_developer_mode": "Developer mode",
         "settings_check_updates": "Check for updates",
         "settings_save": "Save",
         "settings_cancel": "Cancel",
@@ -67,8 +69,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "order_include_title": "What would you like to include?",
         "order_include_label": "Select option:",
         "order_include_selected": "Selected only",
-        "order_include_children": "Children only",
-        "order_include_both": "Selected + children",
+        "order_include_children": "Parts only",
+        "order_include_both": "Subs + parts",
         "order_qty_title": "Order quantity",
         "order_qty_label": "How many assemblies to add?",
         "order_added_title": "Order",
@@ -88,14 +90,75 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "settings_saved_reindex": "Datastruct path updated. Re-index now?",
         "reindex_done_title": "Re-index complete",
         "reindex_done_msg": "BOMs: {boms}\nLines: {lines}\nWarnings: {warnings}\nErrors: {errors}",
+        "reindex_progress_title": "Re-index",
+        "reindex_progress_msg": "ADM is updating the local index. Please wait...",
+        "reindex_progress_running": "Re-index in progress...",
+        "reindex_progress_done": "Re-index complete.",
+        "reindex_progress_failed": "Re-index failed.",
         "help_not_found_title": "User guide not found",
         "help_not_found_msg": "README_EXE_GEBRUIK.pdf was not found next to the app.",
+        "help_dialog_title": "ADM Help",
+        "help_dialog_markdown": """# ADM - Quick Help
+
+## 1) Select datastruct folder
+- Click `Settings`
+- Set the `Datastruct folder`
+- Save
+
+## 2) Re-index
+- Use `Re-index` to refresh all BOM and document links.
+- The app also runs a re-index automatically at startup.
+
+## 3) Find articles and parts
+- Use the search box on the left.
+- Search supports article number, part number, and description text.
+
+## 4) Read the BOM tree
+- Select an article to load its BOM.
+- `Expand all` and `Collapse all` control tree visibility.
+- Double-click a subassembly reference to open that article.
+
+## 5) Linked documents and PDF preview
+- Selecting a BOM line loads linked documents.
+- The PDF preview automatically shows the first PDF in the list.
+- If a PDF has multiple pages, use `<` and `>` to navigate pages.
+
+## 6) Order list
+- Select a BOM item and click `Add to order`.
+- Choose what to include: selected item, children, or both.
+- Export creates `order_lines.xlsx` and a ZIP with linked docs.
+
+## 7) Settings
+- Theme and language can be changed in `Settings`.
+- The app remembers settings between restarts.
+""",
         "preview_no_pdf": "No PDF found in linked documents.",
         "preview_not_pdf": "Selected document is not a PDF.",
         "preview_no_selected": "No PDF selected.",
         "preview_component_missing": "PDF preview component is not available in this environment.",
         "preview_failed_load": "Failed to load PDF preview ({result}).",
         "preview_failed_load_generic": "Failed to load PDF preview.",
+        "preview_page_label": "Page {page}/{count}",
+        "preview_multi_page": "Multiple pages available",
+        "save_bom_done_title": "BOM saved",
+        "save_bom_done_msg": "Saved and re-indexed.\nBOMs: {boms}\nLines: {lines}\nWarnings: {warnings}\nErrors: {errors}",
+        "save_bom_failed_title": "Save failed",
+        "save_bom_missing_file": "Source BOM file was not found.",
+        "save_bom_xls_unsupported": "Editing .xls files is not supported. Save as .xlsx first.",
+        "startup_reindex_title": "Starting ADM",
+        "startup_reindex_msg": "ADM is updating the local index. Please wait...",
+        "startup_reindex_running": "Re-index in progress...",
+        "startup_reindex_done": "Re-index complete.",
+        "startup_reindex_failed": "Re-index failed.",
+        "startup_reindex_error_title": "Startup re-index failed",
+        "startup_reindex_error_msg": "Re-index failed at startup.\n\n{error}",
+        "revision_suggest_title": "Revision suggestions",
+        "revision_suggest_none": "No revision suggestions found.",
+        "revision_col_apply": "Apply",
+        "revision_col_item": "Item",
+        "revision_col_part": "Part NR",
+        "revision_col_current": "Current rev",
+        "revision_col_found": "Found rev",
         "root_label": "ROOT",
         "root_type": "article",
         "warn_max_depth": "Maximum subassembly depth reached (20).",
@@ -119,6 +182,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_expand_all": "Alles uitklappen",
         "btn_collapse_all": "Alles inklappen",
         "btn_add_to_order": "Aan bestelling toevoegen",
+        "btn_save_bom": "BOM opslaan",
+        "btn_revision_check": "Revisiecheck",
         "lbl_select_article": "Selecteer een artikel",
         "lbl_docs_article": "Gekoppelde documenten (artikel)",
         "lbl_pdf_preview": "PDF voorbeeld",
@@ -141,12 +206,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "bom_col_status": "Status",
         "article_col_article": "Artikel",
         "article_col_title": "Titel",
-        "article_col_bom_lines": "BOM regels",
         "settings_title": "Instellingen",
         "settings_datastruct": "Datastruct map",
         "settings_browse": "Bladeren...",
         "settings_dark_mode": "Donkere modus",
         "settings_language": "Taal",
+        "settings_developer_mode": "Developer modus",
         "settings_check_updates": "Controleer updates",
         "settings_save": "Opslaan",
         "settings_cancel": "Annuleren",
@@ -167,8 +232,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "order_include_title": "Wat wil je toevoegen?",
         "order_include_label": "Kies optie:",
         "order_include_selected": "Alleen selectie",
-        "order_include_children": "Alleen children",
-        "order_include_both": "Selectie + children",
+        "order_include_children": "Alleen parts",
+        "order_include_both": "Subs + parts",
         "order_qty_title": "Bestelhoeveelheid",
         "order_qty_label": "Hoeveel assemblies toevoegen?",
         "order_added_title": "Bestelling",
@@ -188,14 +253,75 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "settings_saved_reindex": "Datastruct pad aangepast. Nu herindexeren?",
         "reindex_done_title": "Herindexeren voltooid",
         "reindex_done_msg": "BOMs: {boms}\nRegels: {lines}\nWaarschuwingen: {warnings}\nFouten: {errors}",
+        "reindex_progress_title": "Herindexeren",
+        "reindex_progress_msg": "ADM werkt de lokale index bij. Even geduld...",
+        "reindex_progress_running": "Herindexeren bezig...",
+        "reindex_progress_done": "Herindexeren voltooid.",
+        "reindex_progress_failed": "Herindexeren mislukt.",
         "help_not_found_title": "Handleiding niet gevonden",
         "help_not_found_msg": "README_EXE_GEBRUIK.pdf is niet gevonden naast de app.",
+        "help_dialog_title": "ADM Help",
+        "help_dialog_markdown": """# ADM - Korte Handleiding
+
+## 1) Datastruct map kiezen
+- Klik op `Instellingen`
+- Stel de `Datastruct map` in
+- Sla op
+
+## 2) Herindexeren
+- Gebruik `Herindexeren` om BOM- en documentkoppelingen te vernieuwen.
+- De app draait ook automatisch een herindexering bij opstarten.
+
+## 3) Artikelen en parts zoeken
+- Gebruik het zoekveld links.
+- Zoeken werkt op artikelnummer, partnummer en omschrijving.
+
+## 4) BOM-boom lezen
+- Selecteer een artikel om de BOM te laden.
+- `Alles uitklappen` en `Alles inklappen` sturen de boomweergave.
+- Dubbelklik op een subassembly-reference om dat artikel te openen.
+
+## 5) Gekoppelde documenten en PDF-preview
+- Bij selectie van een BOM-regel worden gekoppelde documenten geladen.
+- De PDF-preview toont automatisch de eerste PDF uit de lijst.
+- Bij meerdere pagina's gebruik je `<` en `>` om te bladeren.
+
+## 6) Bestellijst
+- Selecteer een BOM-item en klik `Aan bestelling toevoegen`.
+- Kies wat je wilt opnemen: selectie, children, of beide.
+- Export maakt `order_lines.xlsx` en een ZIP met gekoppelde documenten.
+
+## 7) Instellingen
+- Thema en taal wijzig je via `Instellingen`.
+- De app onthoudt deze instellingen tussen herstarts.
+""",
         "preview_no_pdf": "Geen PDF gevonden in gekoppelde documenten.",
         "preview_not_pdf": "Geselecteerd document is geen PDF.",
         "preview_no_selected": "Geen PDF geselecteerd.",
         "preview_component_missing": "PDF-previewcomponent is niet beschikbaar in deze omgeving.",
         "preview_failed_load": "PDF preview laden mislukt ({result}).",
         "preview_failed_load_generic": "PDF preview laden mislukt.",
+        "preview_page_label": "Pagina {page}/{count}",
+        "preview_multi_page": "Meerdere pagina's beschikbaar",
+        "save_bom_done_title": "BOM opgeslagen",
+        "save_bom_done_msg": "Opgeslagen en hergeindexeerd.\nBOMs: {boms}\nRegels: {lines}\nWaarschuwingen: {warnings}\nFouten: {errors}",
+        "save_bom_failed_title": "Opslaan mislukt",
+        "save_bom_missing_file": "Bron-BOM-bestand is niet gevonden.",
+        "save_bom_xls_unsupported": "Bewerken van .xls-bestanden wordt niet ondersteund. Sla eerst op als .xlsx.",
+        "startup_reindex_title": "ADM starten",
+        "startup_reindex_msg": "ADM werkt de lokale index bij. Even geduld...",
+        "startup_reindex_running": "Herindexeren bezig...",
+        "startup_reindex_done": "Herindexeren voltooid.",
+        "startup_reindex_failed": "Herindexeren mislukt.",
+        "startup_reindex_error_title": "Herindexeren bij opstarten mislukt",
+        "startup_reindex_error_msg": "Herindexeren bij opstarten is mislukt.\n\n{error}",
+        "revision_suggest_title": "Revisiesuggesties",
+        "revision_suggest_none": "Geen revisiesuggesties gevonden.",
+        "revision_col_apply": "Toepassen",
+        "revision_col_item": "Item",
+        "revision_col_part": "Part NR",
+        "revision_col_current": "Huidige rev",
+        "revision_col_found": "Gevonden rev",
         "root_label": "ROOT",
         "root_type": "artikel",
         "warn_max_depth": "Maximale subassembly diepte bereikt (20).",

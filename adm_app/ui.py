@@ -8,10 +8,11 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import threading
 import zipfile
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
-from PySide6.QtCore import QEasingCurve, Property, QPropertyAnimation, QRect, QRectF, QSize, QTimer, Qt
+from PySide6.QtCore import QEasingCurve, QPointF, Property, QPropertyAnimation, QRect, QRectF, QSize, QTimer, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPalette
 from PySide6.QtWidgets import (
     QApplication,
@@ -28,11 +29,13 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QInputDialog,
     QPushButton,
+    QProgressBar,
     QSizePolicy,
     QSplitter,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -42,8 +45,10 @@ from PySide6.QtWidgets import (
 )
 
 from . import __version__
+from .excel_parser import detect_header
 from .i18n import normalize_language, tr
-from .indexer import run_index
+from .indexer import parse_document_part_and_revision, run_index
+from .mapping import parse_qty
 from .settings_store import AppSettings, save_settings
 from .search import (
     get_article,
@@ -202,6 +207,86 @@ class UnlinkedDocsDialog(QDialog):
             open_file(str(path_item.data(Qt.ItemDataRole.UserRole)))
 
 
+class RevisionSuggestionDialog(QDialog):
+    def __init__(self, rows: list[dict[str, object]], language: str = "en", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.language = normalize_language(language)
+        self.setWindowTitle(tr(self.language, "revision_suggest_title"))
+        self.resize(900, 420)
+        layout = QVBoxLayout(self)
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(
+            [
+                tr(self.language, "revision_col_apply"),
+                tr(self.language, "revision_col_item"),
+                tr(self.language, "revision_col_part"),
+                tr(self.language, "revision_col_current"),
+                tr(self.language, "revision_col_found"),
+            ]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.table)
+
+        self.table.setRowCount(len(rows))
+        for idx, row in enumerate(rows):
+            apply_item = QTableWidgetItem("")
+            apply_item.setFlags(apply_item.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            apply_item.setCheckState(Qt.CheckState.Checked)
+            apply_item.setData(Qt.ItemDataRole.UserRole, row)
+            self.table.setItem(idx, 0, apply_item)
+            self.table.setItem(idx, 1, QTableWidgetItem(str(row.get("item_no") or "")))
+            self.table.setItem(idx, 2, QTableWidgetItem(str(row.get("part_number") or "")))
+            self.table.setItem(idx, 3, QTableWidgetItem(str(row.get("current_revision") or "")))
+            self.table.setItem(idx, 4, QTableWidgetItem(str(row.get("suggested_revision") or "")))
+
+        actions = QHBoxLayout()
+        self.apply_button = QPushButton(tr(self.language, "settings_save"))
+        self.cancel_button = QPushButton(tr(self.language, "settings_cancel"))
+        self.apply_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+        actions.addStretch(1)
+        actions.addWidget(self.apply_button)
+        actions.addWidget(self.cancel_button)
+        layout.addLayout(actions)
+
+    def selected_rows(self) -> list[dict[str, object]]:
+        selected: list[dict[str, object]] = []
+        for row_idx in range(self.table.rowCount()):
+            apply_item = self.table.item(row_idx, 0)
+            if apply_item is None or apply_item.checkState() != Qt.CheckState.Checked:
+                continue
+            payload = apply_item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(payload, dict):
+                selected.append(payload)
+        return selected
+
+
+class HelpDialog(QDialog):
+    def __init__(self, language: str = "en", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.language = normalize_language(language)
+        self.setWindowTitle(tr(self.language, "help_dialog_title"))
+        icon = get_app_icon()
+        if icon is not None:
+            self.setWindowIcon(icon)
+        self.resize(860, 620)
+        layout = QVBoxLayout(self)
+
+        content = QTextEdit()
+        content.setReadOnly(True)
+        content.setMarkdown(tr(self.language, "help_dialog_markdown"))
+        layout.addWidget(content)
+
+        actions = QHBoxLayout()
+        close_button = QPushButton(tr(self.language, "btn_close"))
+        close_button.clicked.connect(self.accept)
+        actions.addStretch(1)
+        actions.addWidget(close_button)
+        layout.addLayout(actions)
+
+
 class ToggleSwitch(QCheckBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -291,15 +376,18 @@ class SettingsDialog(QDialog):
         data_root: str,
         theme_mode: str,
         language: str,
+        developer_mode: bool,
+        developer_toggle_available: bool,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.language = normalize_language(language)
+        self.developer_toggle_available = developer_toggle_available
         self.setWindowTitle(tr(self.language, "settings_title"))
         icon = get_app_icon()
         if icon is not None:
             self.setWindowIcon(icon)
-        self.resize(700, 220)
+        self.resize(700, 280)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(tr(self.language, "settings_datastruct")))
         row = QHBoxLayout()
@@ -328,6 +416,16 @@ class SettingsDialog(QDialog):
         language_row.addWidget(self.language_combo)
         language_row.addStretch(1)
         layout.addLayout(language_row)
+
+        self.developer_toggle: ToggleSwitch | None = None
+        if self.developer_toggle_available:
+            dev_row = QHBoxLayout()
+            dev_row.addWidget(QLabel(tr(self.language, "settings_developer_mode")))
+            self.developer_toggle = ToggleSwitch()
+            self.developer_toggle.setChecked(bool(developer_mode))
+            dev_row.addWidget(self.developer_toggle)
+            dev_row.addStretch(1)
+            layout.addLayout(dev_row)
 
         actions = QHBoxLayout()
         self.check_updates_button = QPushButton(tr(self.language, "settings_check_updates"))
@@ -359,6 +457,11 @@ class SettingsDialog(QDialog):
 
     def selected_language(self) -> str:
         return normalize_language(str(self.language_combo.currentData()))
+
+    def selected_developer_mode(self) -> bool:
+        if self.developer_toggle is None:
+            return False
+        return bool(self.developer_toggle.isChecked())
 
     def check_for_updates_clicked(self) -> None:
         latest = fetch_latest_github_release()
@@ -403,6 +506,7 @@ class MainWindow(QMainWindow):
         theme_mode: str = "light",
         has_seen_help: bool = False,
         language: str = "en",
+        developer_mode: bool = False,
     ) -> None:
         super().__init__()
         self.conn = conn
@@ -410,9 +514,23 @@ class MainWindow(QMainWindow):
         self.theme_mode = theme_mode if theme_mode in {"light", "dark"} else "light"
         self.has_seen_help = has_seen_help
         self.language = normalize_language(language)
+        self.developer_mode = bool(developer_mode)
+        self.developer_toggle_available = os.getenv("COMPUTERNAME", "").strip().lower() in {
+            "laptop-han",
+            "rendlaptop",
+        }
+        if not self.developer_toggle_available:
+            self.developer_mode = False
         self._update_check_done = False
         self.active_search_term = ""
         self.current_article_id: int | None = None
+        self.current_article_source_bom_path = ""
+        self._bom_dirty = False
+        self._suspend_bom_item_changed = False
+        self._pending_bom_edits: dict[int, dict[str, object]] = {}
+        self.current_pdf_path = ""
+        self.current_pdf_page = 0
+        self.current_pdf_page_count = 0
         self.order_cart: dict[str, dict[str, object]] = {}
         self.order_drawer_open = False
         self.order_drawer_width = 380
@@ -458,12 +576,11 @@ class MainWindow(QMainWindow):
         left_area_layout.addLayout(left_controls)
         splitter.addWidget(left_area)
 
-        self.article_table = QTableWidget(0, 3)
+        self.article_table = QTableWidget(0, 2)
         self.article_table.setHorizontalHeaderLabels(
             [
                 tr(self.language, "article_col_article"),
                 tr(self.language, "article_col_title"),
-                tr(self.language, "article_col_bom_lines"),
             ]
         )
         self.article_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
@@ -486,9 +603,15 @@ class MainWindow(QMainWindow):
         self.expand_all_button = QPushButton(tr(self.language, "btn_expand_all"))
         self.collapse_all_button = QPushButton(tr(self.language, "btn_collapse_all"))
         self.add_to_order_button = QPushButton(tr(self.language, "btn_add_to_order"))
+        self.revision_suggest_button = QPushButton(tr(self.language, "btn_revision_check"))
+        self.save_bom_button = QPushButton(tr(self.language, "btn_save_bom"))
+        self.revision_suggest_button.setVisible(self.developer_mode)
+        self.save_bom_button.setVisible(False)
         bom_controls.addWidget(self.expand_all_button)
         bom_controls.addWidget(self.collapse_all_button)
         bom_controls.addWidget(self.add_to_order_button)
+        bom_controls.addWidget(self.revision_suggest_button)
+        bom_controls.addWidget(self.save_bom_button)
         bom_controls.addStretch(1)
         bom_layout.addLayout(bom_controls)
         self.bom_tree = QTreeWidget()
@@ -509,7 +632,14 @@ class MainWindow(QMainWindow):
         self.bom_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.bom_tree.header().setStretchLastSection(True)
         self.bom_tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.bom_tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        if self.developer_mode:
+            self.bom_tree.setEditTriggers(
+                QAbstractItemView.EditTrigger.DoubleClicked
+                | QAbstractItemView.EditTrigger.SelectedClicked
+                | QAbstractItemView.EditTrigger.EditKeyPressed
+            )
+        else:
+            self.bom_tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         bom_layout.addWidget(self.bom_tree)
         self.right_content_splitter.addWidget(bom_container)
 
@@ -540,6 +670,19 @@ class MainWindow(QMainWindow):
         preview_title = QLabel(tr(self.language, "lbl_pdf_preview"))
         preview_title.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         preview_layout.addWidget(preview_title)
+        self.preview_controls_row = QHBoxLayout()
+        self.preview_prev_button = QPushButton("<")
+        self.preview_next_button = QPushButton(">")
+        self.preview_page_label = QLabel("-")
+        self.preview_page_hint = QLabel("")
+        self.preview_prev_button.clicked.connect(self.preview_prev_page)
+        self.preview_next_button.clicked.connect(self.preview_next_page)
+        self.preview_controls_row.addWidget(self.preview_prev_button)
+        self.preview_controls_row.addWidget(self.preview_next_button)
+        self.preview_controls_row.addWidget(self.preview_page_label)
+        self.preview_controls_row.addStretch(1)
+        self.preview_controls_row.addWidget(self.preview_page_hint)
+        preview_layout.addLayout(self.preview_controls_row)
         self.preview_stack = QStackedWidget()
         self.preview_message = QLabel(tr(self.language, "lbl_preview_default"))
         self.preview_message.setWordWrap(True)
@@ -610,6 +753,8 @@ class MainWindow(QMainWindow):
         self.reindex_button.clicked.connect(self.reindex)
         self.unlinked_button.clicked.connect(self.open_unlinked_docs)
         self.add_to_order_button.clicked.connect(self.add_selected_bom_to_order)
+        self.revision_suggest_button.clicked.connect(self.run_revision_suggestions)
+        self.save_bom_button.clicked.connect(self.save_bom_edits)
         self.open_order_button.clicked.connect(self.toggle_order_drawer)
         self.close_order_drawer_button.clicked.connect(self.close_order_drawer)
         self.export_order_button.clicked.connect(self.export_order_bundle)
@@ -621,6 +766,7 @@ class MainWindow(QMainWindow):
         self.docs_list.itemSelectionChanged.connect(self.preview_selected_document)
         self.bom_tree.itemDoubleClicked.connect(self.open_bom_line)
         self.bom_tree.itemSelectionChanged.connect(self.load_docs_for_selected_bom_line)
+        self.bom_tree.itemChanged.connect(self.on_bom_item_changed)
         self.expand_all_button.clicked.connect(self.expand_bom_children_only)
         self.collapse_all_button.clicked.connect(self.collapse_bom_children_only)
 
@@ -647,8 +793,11 @@ class MainWindow(QMainWindow):
         self.expand_all_button.setText(tr(self.language, "btn_expand_all"))
         self.collapse_all_button.setText(tr(self.language, "btn_collapse_all"))
         self.add_to_order_button.setText(tr(self.language, "btn_add_to_order"))
+        self.revision_suggest_button.setText(tr(self.language, "btn_revision_check"))
+        self.save_bom_button.setText(tr(self.language, "btn_save_bom"))
         self.docs_context_label.setText(tr(self.language, "lbl_docs_article"))
         self.preview_message.setText(tr(self.language, "lbl_preview_default"))
+        self.preview_page_hint.setText("")
         self.close_order_drawer_button.setText(tr(self.language, "btn_close"))
         self.export_order_button.setText(tr(self.language, "btn_export_xlsx_zip"))
         self.clear_order_button.setText(tr(self.language, "btn_clear"))
@@ -656,7 +805,6 @@ class MainWindow(QMainWindow):
             [
                 tr(self.language, "article_col_article"),
                 tr(self.language, "article_col_title"),
-                tr(self.language, "article_col_bom_lines"),
             ]
         )
         self.bom_tree.setHeaderLabels(
@@ -680,6 +828,7 @@ class MainWindow(QMainWindow):
                 "",
             ]
         )
+        self.update_preview_controls()
 
     def refresh_articles(self) -> None:
         self.active_search_term = self.search_input.text().strip()
@@ -690,7 +839,6 @@ class MainWindow(QMainWindow):
             article_item.setData(Qt.ItemDataRole.UserRole, int(row["id"]))
             self.article_table.setItem(row_idx, 0, article_item)
             self.article_table.setItem(row_idx, 1, QTableWidgetItem(row["title"] or ""))
-            self.article_table.setItem(row_idx, 2, QTableWidgetItem(str(row["bom_line_count"])))
         if rows:
             self.article_table.selectRow(0)
 
@@ -724,7 +872,12 @@ class MainWindow(QMainWindow):
         article = get_article(self.conn, article_id)
         if not article:
             return
+        self._suspend_bom_item_changed = True
         self.current_article_id = article_id
+        self.current_article_source_bom_path = str(article["source_bom_path"] or "")
+        self._bom_dirty = False
+        self._pending_bom_edits = {}
+        self.save_bom_button.setVisible(False)
         self.article_title_label.setText(
             f"<b>Article {article['article_number']}</b> - {article['title'] or ''}<br>{article['source_bom_filename'] or ''}"
         )
@@ -770,6 +923,8 @@ class MainWindow(QMainWindow):
             tree_item.setData(2, Qt.ItemDataRole.UserRole, line["revision"] or "")
             tree_item.setData(3, Qt.ItemDataRole.UserRole, line["part_id"])
             tree_item.setData(4, Qt.ItemDataRole.UserRole, float(line["qty"]) if line["qty"] is not None else 1.0)
+            tree_item.setData(7, Qt.ItemDataRole.UserRole, str(line["source_sheet"] or ""))
+            tree_item.setData(8, Qt.ItemDataRole.UserRole, int(line["source_row_number"] or 0))
             child_article_id = article_ref_map.get(str(line["part_number"] or "").strip())
             if child_article_id is not None:
                 tree_item.setData(5, Qt.ItemDataRole.UserRole, "assembly_ref")
@@ -777,6 +932,8 @@ class MainWindow(QMainWindow):
             else:
                 tree_item.setData(5, Qt.ItemDataRole.UserRole, "part")
                 tree_item.setData(6, Qt.ItemDataRole.UserRole, None)
+            if self.developer_mode:
+                tree_item.setFlags(tree_item.flags() | Qt.ItemFlag.ItemIsEditable)
             self.apply_status_style(tree_item, values[8], 8)
 
             parent_item = items_by_item_no.get(self.parent_item_no(item_no))
@@ -796,6 +953,7 @@ class MainWindow(QMainWindow):
             self.expand_path_to_item(selected_item)
             self.bom_tree.setCurrentItem(selected_item)
             self.bom_tree.scrollToItem(selected_item)
+        self._suspend_bom_item_changed = False
 
     def parent_item_no(self, item_no: str) -> str:
         value = (item_no or "").strip()
@@ -949,20 +1107,79 @@ class MainWindow(QMainWindow):
         self.preview_first_pdf_in_list()
 
     def reindex(self) -> None:
-        stats = run_index(self.conn, data_root=self._path_to_root())
+        target_article_id = int(self.current_article_id or 0)
+        stats = self.run_reindex_with_progress()
+        if stats is None:
+            return
         self.refresh_articles()
-        QMessageBox.information(
-            self,
-            tr(self.language, "reindex_done_title"),
-            tr(
-                self.language,
-                "reindex_done_msg",
-                boms=stats.boms_parsed,
-                lines=stats.lines_imported,
-                warnings=stats.warnings_count,
-                errors=stats.errors_count,
-            ),
-        )
+        if target_article_id > 0:
+            if self.select_article_in_table(target_article_id):
+                self.display_article_by_id(target_article_id)
+            else:
+                self.display_article_by_id(target_article_id)
+
+    def run_reindex_with_progress(self) -> object | None:
+        progress_dialog = QDialog(self)
+        progress_dialog.setWindowTitle(tr(self.language, "reindex_progress_title"))
+        progress_dialog.setModal(True)
+        progress_dialog.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
+        progress_dialog.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
+        progress_dialog.setFixedSize(460, 130)
+        layout = QVBoxLayout(progress_dialog)
+        layout.addWidget(QLabel(tr(self.language, "reindex_progress_msg")))
+        bar = QProgressBar()
+        bar.setRange(0, 0)
+        layout.addWidget(bar)
+        status_label = QLabel(tr(self.language, "reindex_progress_running"))
+        layout.addWidget(status_label)
+
+        result: dict[str, object] = {"stats": None, "error": None, "done": False}
+        data_root_path = self._path_to_root()
+        db_row = self.conn.execute("PRAGMA database_list").fetchone()
+        db_path = Path(str(db_row["file"] if db_row and "file" in db_row.keys() else "")).resolve()
+
+        def _index_in_background() -> None:
+            from .db import get_connection
+
+            local_conn = get_connection(db_path)
+            try:
+                result["stats"] = run_index(local_conn, data_root=data_root_path)
+            except Exception as exc:
+                result["error"] = str(exc)
+            finally:
+                local_conn.close()
+                result["done"] = True
+
+        worker = threading.Thread(target=_index_in_background, daemon=True)
+        worker.start()
+
+        poll_timer = QTimer(progress_dialog)
+
+        def _poll() -> None:
+            if not bool(result.get("done")):
+                return
+            poll_timer.stop()
+            if result.get("error"):
+                status_label.setText(tr(self.language, "reindex_progress_failed"))
+                progress_dialog.reject()
+                return
+            status_label.setText(tr(self.language, "reindex_progress_done"))
+            progress_dialog.accept()
+
+        poll_timer.setInterval(100)
+        poll_timer.timeout.connect(_poll)
+        poll_timer.start()
+        progress_dialog.exec()
+        worker.join(timeout=10.0)
+
+        if result["error"]:
+            QMessageBox.warning(
+                self,
+                tr(self.language, "reindex_done_title"),
+                tr(self.language, "startup_reindex_error_msg", error=str(result["error"])),
+            )
+            return None
+        return result["stats"]
 
     def _path_to_root(self):
         from pathlib import Path
@@ -1009,20 +1226,21 @@ class MainWindow(QMainWindow):
         if current is None:
             QMessageBox.information(self, tr(self.language, "order_added_title"), tr(self.language, "order_select_first"))
             return
-        include_choice, choice_ok = QInputDialog.getItem(
-            self,
-            tr(self.language, "order_include_title"),
-            tr(self.language, "order_include_label"),
+        include_dialog = QInputDialog(self)
+        include_dialog.setWindowTitle(tr(self.language, "order_include_title"))
+        include_dialog.setLabelText(tr(self.language, "order_include_label"))
+        include_dialog.setComboBoxItems(
             [
-                tr(self.language, "order_include_selected"),
                 tr(self.language, "order_include_children"),
+                tr(self.language, "order_include_selected"),
                 tr(self.language, "order_include_both"),
-            ],
-            2,
-            False,
+            ]
         )
-        if not choice_ok:
+        include_dialog.setComboBoxEditable(False)
+        include_dialog.resize(350, include_dialog.sizeHint().height())
+        if include_dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        include_choice = include_dialog.textValue()
         qty_multiplier, ok = QInputDialog.getInt(
             self,
             tr(self.language, "order_qty_title"),
@@ -1035,30 +1253,52 @@ class MainWindow(QMainWindow):
         if not ok:
             return
         node_type = str(current.data(5, Qt.ItemDataRole.UserRole) or "")
-        items = [current]
-        if node_type != "article":
-            if include_choice == tr(self.language, "order_include_children"):
-                items = self.collect_tree_leaf_items(current)
-            elif include_choice == tr(self.language, "order_include_both"):
-                items = self.collect_tree_items(current)
-            else:
-                items = [current]
         added_lines = 0
         warnings: list[str] = []
+        qty_factor = float(qty_multiplier)
+        selected_only_label = tr(self.language, "order_include_selected")
+        children_only_label = tr(self.language, "order_include_children")
+        both_label = tr(self.language, "order_include_both")
+        include_selected = include_choice == selected_only_label
+        include_children = include_choice == children_only_label
+        include_full_tree = include_choice == both_label
+
         if node_type == "article":
             article_id = int(current.data(0, Qt.ItemDataRole.UserRole))
-            added_lines += self.add_article_to_cart_exploded(
-                article_id=article_id,
-                qty_factor=float(qty_multiplier),
-                visited={article_id},
-                depth=0,
-                warnings=warnings,
-            )
+            if include_children:
+                for idx in range(current.childCount()):
+                    added_lines += self.add_tree_children_to_cart(
+                        item=current.child(idx),
+                        qty_factor=qty_factor,
+                        visited={article_id},
+                        depth=0,
+                        warnings=warnings,
+                    )
+            elif include_full_tree:
+                for idx in range(current.childCount()):
+                    added_lines += self.add_tree_full_to_cart(
+                        item=current.child(idx),
+                        qty_factor=qty_factor,
+                        visited={article_id},
+                        depth=0,
+                        warnings=warnings,
+                    )
         else:
-            for item in items:
-                added_lines += self.add_tree_item_to_cart_exploded(
-                    item=item,
-                    qty_factor=float(qty_multiplier),
+            if include_selected:
+                added_lines += 1 if self.add_leaf_to_cart(current, qty_factor=qty_factor) else 0
+            if include_children:
+                added_lines += self.add_tree_children_to_cart(
+                    item=current,
+                    qty_factor=qty_factor,
+                    visited=set(),
+                    depth=0,
+                    warnings=warnings,
+                    include_self_leaf=False,
+                )
+            elif include_full_tree:
+                added_lines += self.add_tree_full_to_cart(
+                    item=current,
+                    qty_factor=qty_factor,
                     visited=set(),
                     depth=0,
                     warnings=warnings,
@@ -1074,32 +1314,33 @@ class MainWindow(QMainWindow):
             tr(self.language, "order_added_msg", count=added_lines, warnings=warn_text),
         )
 
-    def collect_tree_items(self, root: QTreeWidgetItem) -> list[QTreeWidgetItem]:
-        result = [root]
-        for idx in range(root.childCount()):
-            result.extend(self.collect_tree_items(root.child(idx)))
-        return result
-
-    def collect_tree_leaf_items(self, root: QTreeWidgetItem) -> list[QTreeWidgetItem]:
-        if root.childCount() == 0:
-            return [root]
-        leaves: list[QTreeWidgetItem] = []
-        for idx in range(root.childCount()):
-            leaves.extend(self.collect_tree_leaf_items(root.child(idx)))
-        return leaves
-
-    def add_tree_item_to_cart_exploded(
+    def add_tree_children_to_cart(
         self,
         item: QTreeWidgetItem,
         qty_factor: float,
         visited: set[int],
         depth: int,
         warnings: list[str],
+        include_self_leaf: bool = True,
     ) -> int:
         if depth > 20:
             warnings.append(tr(self.language, "warn_max_depth"))
             return 0
         node_type = str(item.data(5, Qt.ItemDataRole.UserRole) or "")
+        line_qty = float(item.data(4, Qt.ItemDataRole.UserRole) or 1.0)
+        # Any expandable tree node acts as a parent-only quantity multiplier.
+        # It must not be added as a leaf line in children mode.
+        if item.childCount() > 0:
+            added = 0
+            for idx in range(item.childCount()):
+                added += self.add_tree_children_to_cart(
+                    item=item.child(idx),
+                    qty_factor=qty_factor * line_qty,
+                    visited=visited,
+                    depth=depth + 1,
+                    warnings=warnings,
+                )
+            return added
         if node_type == "assembly_ref":
             child_article_id = item.data(6, Qt.ItemDataRole.UserRole)
             if child_article_id is None:
@@ -1109,8 +1350,7 @@ class MainWindow(QMainWindow):
             if child_article_id is None:
                 warnings.append(tr(self.language, "warn_missing_subassembly", part=item.text(1)))
                 return 0
-            line_qty = float(item.data(4, Qt.ItemDataRole.UserRole) or 1.0)
-            return self.add_article_to_cart_exploded(
+            return self.add_article_children_to_cart(
                 article_id=int(child_article_id),
                 qty_factor=qty_factor * line_qty,
                 visited=visited | {int(child_article_id)},
@@ -1122,8 +1362,7 @@ class MainWindow(QMainWindow):
             if resolved_article_id is not None:
                 item.setData(5, Qt.ItemDataRole.UserRole, "assembly_ref")
                 item.setData(6, Qt.ItemDataRole.UserRole, int(resolved_article_id))
-                line_qty = float(item.data(4, Qt.ItemDataRole.UserRole) or 1.0)
-                return self.add_article_to_cart_exploded(
+                return self.add_article_children_to_cart(
                     article_id=int(resolved_article_id),
                     qty_factor=qty_factor * line_qty,
                     visited=visited | {int(resolved_article_id)},
@@ -1132,16 +1371,79 @@ class MainWindow(QMainWindow):
                 )
         if node_type == "article":
             article_id = int(item.data(0, Qt.ItemDataRole.UserRole))
-            return self.add_article_to_cart_exploded(
+            return self.add_article_children_to_cart(
                 article_id=article_id,
                 qty_factor=qty_factor,
                 visited=visited | {article_id},
                 depth=depth + 1,
                 warnings=warnings,
             )
+        if not include_self_leaf:
+            return 0
         return 1 if self.add_leaf_to_cart(item, qty_factor=qty_factor) else 0
 
-    def add_article_to_cart_exploded(
+    def add_tree_full_to_cart(
+        self,
+        item: QTreeWidgetItem,
+        qty_factor: float,
+        visited: set[int],
+        depth: int,
+        warnings: list[str],
+    ) -> int:
+        if depth > 20:
+            warnings.append(tr(self.language, "warn_max_depth"))
+            return 0
+        node_type = str(item.data(5, Qt.ItemDataRole.UserRole) or "")
+        line_qty = float(item.data(4, Qt.ItemDataRole.UserRole) or 1.0)
+        added = 0
+
+        if node_type != "article":
+            added += 1 if self.add_leaf_to_cart(item, qty_factor=qty_factor) else 0
+
+        if item.childCount() > 0:
+            for idx in range(item.childCount()):
+                added += self.add_tree_full_to_cart(
+                    item=item.child(idx),
+                    qty_factor=qty_factor * line_qty,
+                    visited=visited,
+                    depth=depth + 1,
+                    warnings=warnings,
+                )
+            return added
+
+        if node_type == "assembly_ref":
+            child_article_id = item.data(6, Qt.ItemDataRole.UserRole)
+            if child_article_id is None:
+                child_article_id = self.resolve_article_ref_id(item.text(1))
+                if child_article_id is not None:
+                    item.setData(6, Qt.ItemDataRole.UserRole, int(child_article_id))
+            if child_article_id is None:
+                warnings.append(tr(self.language, "warn_missing_subassembly", part=item.text(1)))
+                return added
+            return added + self.add_article_children_to_cart(
+                article_id=int(child_article_id),
+                qty_factor=qty_factor * line_qty,
+                visited=visited | {int(child_article_id)},
+                depth=depth + 1,
+                warnings=warnings,
+            )
+
+        if node_type == "part":
+            resolved_article_id = self.resolve_article_ref_id(item.text(1))
+            if resolved_article_id is not None:
+                item.setData(5, Qt.ItemDataRole.UserRole, "assembly_ref")
+                item.setData(6, Qt.ItemDataRole.UserRole, int(resolved_article_id))
+                return added + self.add_article_children_to_cart(
+                    article_id=int(resolved_article_id),
+                    qty_factor=qty_factor * line_qty,
+                    visited=visited | {int(resolved_article_id)},
+                    depth=depth + 1,
+                    warnings=warnings,
+                )
+
+        return added
+
+    def add_article_children_to_cart(
         self,
         article_id: int,
         qty_factor: float,
@@ -1168,7 +1470,7 @@ class MainWindow(QMainWindow):
                 if child_id in visited:
                     warnings.append(tr(self.language, "warn_cycle_detected", part=line_part))
                     continue
-                added += self.add_article_to_cart_exploded(
+                added += self.add_article_children_to_cart(
                     article_id=child_id,
                     qty_factor=effective_qty,
                     visited=visited | {child_id},
@@ -1442,8 +1744,208 @@ class MainWindow(QMainWindow):
             tr(self.language, "order_export_done_msg", xlsx=xlsx_path, docs=copied_docs, zip_path=zip_path),
         )
 
+    def on_bom_item_changed(self, item: QTreeWidgetItem, _column: int) -> None:
+        if self._suspend_bom_item_changed or not self.developer_mode:
+            return
+        node_type = str(item.data(5, Qt.ItemDataRole.UserRole) or "")
+        if node_type == "article":
+            return
+        line_id = item.data(0, Qt.ItemDataRole.UserRole)
+        if line_id is None:
+            return
+        self._pending_bom_edits[int(line_id)] = {
+            "line_id": int(line_id),
+            "item_no": str(item.text(0) or "").strip(),
+            "part_number": str(item.text(1) or "").strip(),
+            "revision": str(item.text(2) or "").strip(),
+            "description": str(item.text(3) or "").strip(),
+            "material": str(item.text(4) or "").strip(),
+            "finish": str(item.text(5) or "").strip(),
+            "qty": str(item.text(6) or "").strip(),
+            "line_type": str(item.text(7) or "").strip(),
+            "status": str(item.text(8) or "").strip(),
+            "source_sheet": str(item.data(7, Qt.ItemDataRole.UserRole) or ""),
+            "source_row_number": int(item.data(8, Qt.ItemDataRole.UserRole) or 0),
+        }
+        self._bom_dirty = True
+        self.save_bom_button.setVisible(True)
+
+    def bom_field_for_column(self, col: int) -> str | None:
+        mapping = {
+            0: "line_no",
+            1: "part_number",
+            2: "revision",
+            3: "description",
+            4: "material",
+            5: "finish",
+            6: "qty",
+            7: "line_type",
+            8: "status",
+        }
+        return mapping.get(col)
+
+    def save_bom_edits(self) -> None:
+        if not self.developer_mode or not self._pending_bom_edits:
+            return
+        source_path = Path(self.current_article_source_bom_path)
+        if not source_path.exists():
+            QMessageBox.warning(self, tr(self.language, "save_bom_failed_title"), tr(self.language, "save_bom_missing_file"))
+            return
+        if source_path.suffix.lower() == ".xls":
+            QMessageBox.warning(self, tr(self.language, "save_bom_failed_title"), tr(self.language, "save_bom_xls_unsupported"))
+            return
+        try:
+            workbook = load_workbook(source_path)
+            sheet_header_map: dict[str, dict[int, str]] = {}
+            for ws in workbook.worksheets:
+                rows = [list(row) for row in ws.iter_rows(values_only=True)]
+                _, header_map = detect_header(rows)
+                sheet_header_map[ws.title] = header_map
+
+            for edit in self._pending_bom_edits.values():
+                sheet_name = str(edit.get("source_sheet") or "")
+                row_number = int(edit.get("source_row_number") or 0)
+                if not sheet_name or row_number <= 0:
+                    continue
+                ws = workbook[sheet_name]
+                header_map = sheet_header_map.get(sheet_name, {})
+                inverse_map = {canonical: idx for idx, canonical in header_map.items()}
+                field_values = {
+                    "line_no": str(edit.get("item_no") or ""),
+                    "part_number": str(edit.get("part_number") or ""),
+                    "revision": str(edit.get("revision") or ""),
+                    "description": str(edit.get("description") or ""),
+                    "material": str(edit.get("material") or ""),
+                    "finish": str(edit.get("finish") or ""),
+                    "qty": str(edit.get("qty") or ""),
+                    "line_type": str(edit.get("line_type") or ""),
+                    "status": str(edit.get("status") or ""),
+                }
+                for field, raw_value in field_values.items():
+                    col_idx = inverse_map.get(field)
+                    if col_idx is None:
+                        continue
+                    out_value: object = raw_value
+                    if field == "qty":
+                        parsed = parse_qty(raw_value)
+                        out_value = parsed if parsed is not None else raw_value
+                    ws.cell(row=row_number, column=col_idx + 1, value=out_value)
+
+            workbook.save(source_path)
+        except Exception as exc:
+            QMessageBox.warning(self, tr(self.language, "save_bom_failed_title"), str(exc))
+            return
+
+        self._pending_bom_edits = {}
+        self._bom_dirty = False
+        self.save_bom_button.setVisible(False)
+        target_article_id = int(self.current_article_id or 0)
+        stats = run_index(self.conn, data_root=self._path_to_root())
+        self.refresh_articles()
+        if target_article_id > 0:
+            if self.select_article_in_table(target_article_id):
+                self.display_article_by_id(target_article_id)
+            else:
+                self.display_article_by_id(target_article_id)
+        QMessageBox.information(
+            self,
+            tr(self.language, "save_bom_done_title"),
+            tr(
+                self.language,
+                "save_bom_done_msg",
+                boms=stats.boms_parsed,
+                lines=stats.lines_imported,
+                warnings=stats.warnings_count,
+                errors=stats.errors_count,
+            ),
+        )
+
+    def run_revision_suggestions(self) -> None:
+        if not self.developer_mode or self.current_article_id is None:
+            return
+        lines = get_article_bom_lines(self.conn, int(self.current_article_id))
+        rows: list[dict[str, object]] = []
+        for line in lines:
+            current_rev = str(line["revision"] or "").strip().upper()
+            if current_rev:
+                continue
+            part_number = str(line["part_number"] or "").strip()
+            if not part_number:
+                continue
+            docs = self.conn.execute(
+                "SELECT filename FROM documents WHERE UPPER(filename) LIKE ?",
+                (f"%{part_number.upper()}%",),
+            ).fetchall()
+            found_revs: list[str] = []
+            for doc in docs:
+                parsed = parse_document_part_and_revision(str(doc["filename"] or ""))
+                if not parsed:
+                    continue
+                parsed_part, parsed_rev = parsed
+                if parsed_part != part_number.upper() or not parsed_rev:
+                    continue
+                rev_letter = parsed_rev.strip().upper()[:1]
+                if len(rev_letter) == 1 and rev_letter.isalpha():
+                    found_revs.append(rev_letter)
+            if not found_revs:
+                continue
+            chosen = sorted(set(found_revs))[-1]
+            rows.append(
+                {
+                    "line_id": int(line["id"]),
+                    "item_no": str(line["item_no"] or ""),
+                    "part_number": part_number,
+                    "current_revision": current_rev,
+                    "suggested_revision": chosen,
+                }
+            )
+        if not rows:
+            QMessageBox.information(self, tr(self.language, "revision_suggest_title"), tr(self.language, "revision_suggest_none"))
+            return
+        dlg = RevisionSuggestionDialog(rows, language=self.language, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        selected = dlg.selected_rows()
+        if not selected:
+            return
+        for row in selected:
+            line_id = int(row["line_id"])
+            item = self.find_tree_item_by_line_id(line_id)
+            if item is None:
+                continue
+            self._suspend_bom_item_changed = True
+            item.setText(2, str(row["suggested_revision"]))
+            self._suspend_bom_item_changed = False
+            self.on_bom_item_changed(item, 2)
+
+    def find_tree_item_by_line_id(self, line_id: int) -> QTreeWidgetItem | None:
+        def walk(node: QTreeWidgetItem) -> QTreeWidgetItem | None:
+            current_line_id = node.data(0, Qt.ItemDataRole.UserRole)
+            if current_line_id is not None and int(current_line_id) == line_id:
+                return node
+            for i in range(node.childCount()):
+                found = walk(node.child(i))
+                if found is not None:
+                    return found
+            return None
+
+        for top_idx in range(self.bom_tree.topLevelItemCount()):
+            top = self.bom_tree.topLevelItem(top_idx)
+            found = walk(top)
+            if found is not None:
+                return found
+        return None
+
     def open_settings(self) -> None:
-        dlg = SettingsDialog(self.data_root, self.theme_mode, self.language, self)
+        previous_data_root = self.data_root
+        dlg = SettingsDialog(
+            self.data_root,
+            self.theme_mode,
+            self.language,
+            developer_mode=self.developer_mode,
+            developer_toggle_available=self.developer_toggle_available,
+            parent=self,
+        )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         new_root = dlg.selected_data_root()
@@ -1457,29 +1959,84 @@ class MainWindow(QMainWindow):
         self.data_root = str(new_path.resolve())
         self.theme_mode = dlg.selected_theme_mode()
         self.language = dlg.selected_language()
+        self.developer_mode = dlg.selected_developer_mode() if self.developer_toggle_available else False
         save_settings(
             AppSettings(
                 data_root=self.data_root,
                 theme_mode=self.theme_mode,
                 has_seen_help=self.has_seen_help,
                 language=self.language,
+                developer_mode=self.developer_mode,
             )
         )
         self.apply_translations()
         self.apply_theme(self.theme_mode)
-        should_reindex = QMessageBox.question(
-            self,
-            tr(self.language, "settings_saved_title"),
-            tr(self.language, "settings_saved_reindex"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
-        )
-        if should_reindex == QMessageBox.StandardButton.Yes:
+        if self.developer_mode:
+            self.bom_tree.setEditTriggers(
+                QAbstractItemView.EditTrigger.DoubleClicked
+                | QAbstractItemView.EditTrigger.SelectedClicked
+                | QAbstractItemView.EditTrigger.EditKeyPressed
+            )
+        else:
+            self.bom_tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            self._pending_bom_edits = {}
+            self._bom_dirty = False
+            self.save_bom_button.setVisible(False)
+        self.revision_suggest_button.setVisible(self.developer_mode)
+        if str(previous_data_root).strip().lower() != str(self.data_root).strip().lower():
             self.reindex()
 
     def set_preview_message(self, message: str) -> None:
         self.preview_message.setText(message)
         self.preview_stack.setCurrentWidget(self.preview_message)
+        self.current_pdf_path = ""
+        self.current_pdf_page = 0
+        self.current_pdf_page_count = 0
+        self.update_preview_controls()
+
+    def update_preview_controls(self) -> None:
+        if self.current_pdf_page_count <= 0:
+            self.preview_prev_button.setEnabled(False)
+            self.preview_next_button.setEnabled(False)
+            self.preview_page_label.setText("-")
+            self.preview_page_hint.setText("")
+            return
+        self.preview_prev_button.setEnabled(self.current_pdf_page > 0)
+        self.preview_next_button.setEnabled(self.current_pdf_page < self.current_pdf_page_count - 1)
+        self.preview_page_label.setText(
+            tr(
+                self.language,
+                "preview_page_label",
+                page=self.current_pdf_page + 1,
+                count=self.current_pdf_page_count,
+            )
+        )
+        if self.current_pdf_page_count > 1:
+            self.preview_page_hint.setText(tr(self.language, "preview_multi_page"))
+        else:
+            self.preview_page_hint.setText("")
+
+    def preview_prev_page(self) -> None:
+        if self.current_pdf_page_count <= 0:
+            return
+        self.set_pdf_page(self.current_pdf_page - 1)
+
+    def preview_next_page(self) -> None:
+        if self.current_pdf_page_count <= 0:
+            return
+        self.set_pdf_page(self.current_pdf_page + 1)
+
+    def set_pdf_page(self, page: int) -> None:
+        if self.pdf_view is None or self.current_pdf_page_count <= 0:
+            return
+        page_safe = max(0, min(int(page), self.current_pdf_page_count - 1))
+        self.current_pdf_page = page_safe
+        navigator = self.pdf_view.pageNavigator()
+        try:
+            navigator.jump(page_safe, QPointF(), 0.0)
+        except TypeError:
+            navigator.jump(page_safe, QPointF())
+        self.update_preview_controls()
 
     def preview_first_pdf_in_list(self) -> None:
         for idx in range(self.docs_list.count()):
@@ -1518,9 +2075,14 @@ class MainWindow(QMainWindow):
         if no_error is None and str(load_result).lower() not in ("error.none", "none", "noerror", "error.noerror"):
             self.set_preview_message(tr(self.language, "preview_failed_load_generic"))
             return
+        self.current_pdf_path = path
+        self.current_pdf_page_count = int(self.pdf_document.pageCount())
+        self.current_pdf_page = 0
         self.pdf_view.verticalScrollBar().setValue(0)
         self.pdf_view.horizontalScrollBar().setValue(0)
+        self.set_pdf_page(0)
         self.preview_stack.setCurrentWidget(self.pdf_view)
+        self.update_preview_controls()
 
     def apply_status_style(self, item: QTreeWidgetItem, status_text: str, column: int) -> None:
         normalized = (status_text or "").strip().lower()
@@ -1536,14 +2098,6 @@ class MainWindow(QMainWindow):
         apply_app_theme(theme_mode)
 
     def resolve_help_pdf_path(self) -> Path | None:
-        candidates = [
-            Path(sys.executable).resolve().parent / "README_EXE_GEBRUIK.pdf",
-            Path(__file__).resolve().parents[1] / "README_EXE_GEBRUIK.pdf",
-            Path.cwd() / "README_EXE_GEBRUIK.pdf",
-        ]
-        for candidate in candidates:
-            if candidate.exists():
-                return candidate
         return None
 
     def open_help_manual_clicked(self) -> None:
@@ -1553,16 +2107,9 @@ class MainWindow(QMainWindow):
         self.open_help_manual(mark_seen=True, show_warning=True)
 
     def open_help_manual(self, mark_seen: bool, show_warning: bool) -> None:
-        help_pdf = self.resolve_help_pdf_path()
-        if help_pdf is None:
-            if show_warning:
-                QMessageBox.warning(
-                    self,
-                    tr(self.language, "help_not_found_title"),
-                    tr(self.language, "help_not_found_msg"),
-                )
-        else:
-            open_file(str(help_pdf))
+        _ = show_warning
+        dlg = HelpDialog(language=self.language, parent=self)
+        dlg.exec()
 
         if mark_seen and not self.has_seen_help:
             self.has_seen_help = True
@@ -1572,6 +2119,7 @@ class MainWindow(QMainWindow):
                     theme_mode=self.theme_mode,
                     has_seen_help=True,
                     language=self.language,
+                    developer_mode=self.developer_mode,
                 )
             )
 
@@ -1705,12 +2253,79 @@ def run_ui(
     theme_mode: str = "light",
     has_seen_help: bool = False,
     language: str = "en",
+    developer_mode: bool = False,
 ) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     icon = get_app_icon()
     if icon is not None:
         app.setWindowIcon(icon)
     apply_app_theme(theme_mode)
-    win = MainWindow(conn, data_root=data_root, theme_mode=theme_mode, has_seen_help=has_seen_help, language=language)
+    startup_dialog = QDialog()
+    startup_dialog.setWindowTitle(tr(language, "startup_reindex_title"))
+    startup_dialog.setModal(True)
+    startup_dialog.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
+    startup_dialog.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
+    startup_dialog.setFixedSize(460, 130)
+    startup_layout = QVBoxLayout(startup_dialog)
+    startup_layout.addWidget(QLabel(tr(language, "startup_reindex_msg")))
+    startup_bar = QProgressBar()
+    startup_bar.setRange(0, 0)
+    startup_layout.addWidget(startup_bar)
+    startup_status = QLabel(tr(language, "startup_reindex_running"))
+    startup_layout.addWidget(startup_status)
+
+    startup_result: dict[str, object] = {"stats": None, "error": None, "done": False}
+    db_row = conn.execute("PRAGMA database_list").fetchone()
+    db_path = Path(str(db_row["file"] if db_row and "file" in db_row.keys() else "")).resolve()
+    data_root_path = Path(data_root).resolve()
+
+    def _index_in_background() -> None:
+        from .db import get_connection
+
+        local_conn = get_connection(db_path)
+        try:
+            startup_result["stats"] = run_index(local_conn, data_root_path)
+        except Exception as exc:
+            startup_result["error"] = str(exc)
+        finally:
+            local_conn.close()
+            startup_result["done"] = True
+
+    worker = threading.Thread(target=_index_in_background, daemon=True)
+    worker.start()
+
+    poll_timer = QTimer(startup_dialog)
+
+    def _poll_status() -> None:
+        if not bool(startup_result.get("done")):
+            return
+        poll_timer.stop()
+        if startup_result.get("error"):
+            startup_status.setText(tr(language, "startup_reindex_failed"))
+            startup_dialog.reject()
+            return
+        startup_status.setText(tr(language, "startup_reindex_done"))
+        startup_dialog.accept()
+
+    poll_timer.setInterval(100)
+    poll_timer.timeout.connect(_poll_status)
+    poll_timer.start()
+    startup_dialog.exec()
+    worker.join(timeout=10.0)
+
+    if startup_result["error"]:
+        QMessageBox.warning(
+            None,
+            tr(language, "startup_reindex_error_title"),
+            tr(language, "startup_reindex_error_msg", error=str(startup_result["error"])),
+        )
+    win = MainWindow(
+        conn,
+        data_root=data_root,
+        theme_mode=theme_mode,
+        has_seen_help=has_seen_help,
+        language=language,
+        developer_mode=developer_mode,
+    )
     win.show()
     return app.exec()

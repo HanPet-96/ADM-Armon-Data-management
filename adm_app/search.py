@@ -82,7 +82,9 @@ def get_article_bom_lines(conn: sqlite3.Connection, article_id: int) -> list[sql
             bl.material,
             bl.finish,
             bl.line_type,
-            bl.status
+            bl.status,
+            bl.source_sheet,
+            bl.source_row_number
         FROM bom_lines bl
         JOIN parts p ON p.id = bl.part_id
         WHERE bl.article_id=?

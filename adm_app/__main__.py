@@ -56,12 +56,13 @@ def main() -> int:
                 theme_mode=settings.theme_mode,
                 has_seen_help=settings.has_seen_help,
                 language=settings.language,
+                developer_mode=settings.developer_mode,
             )
         )
     db_path = Path(args.db_path).resolve() if args.db_path else default_db_path()
     conn = get_connection(db_path)
     init_db(conn)
-    if args.reindex:
+    if args.reindex and args.no_ui:
         stats = run_index(conn, data_root)
         print(
             f"Indexed: boms={stats.boms_parsed}, lines={stats.lines_imported}, "
@@ -75,6 +76,7 @@ def main() -> int:
         theme_mode=settings.theme_mode,
         has_seen_help=settings.has_seen_help,
         language=settings.language,
+        developer_mode=settings.developer_mode,
     )
 
 

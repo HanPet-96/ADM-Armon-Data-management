@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS articles (
     title TEXT,
     source_bom_filename TEXT,
     source_bom_path TEXT,
+    source_bom_modified_at TEXT,
+    source_bom_size_bytes INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -108,9 +110,18 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_SQL)
+    ensure_articles_columns(conn)
     ensure_bom_lines_columns(conn)
     ensure_documents_columns(conn)
     conn.commit()
+
+
+def ensure_articles_columns(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(articles)").fetchall()}
+    if "source_bom_modified_at" not in columns:
+        conn.execute("ALTER TABLE articles ADD COLUMN source_bom_modified_at TEXT")
+    if "source_bom_size_bytes" not in columns:
+        conn.execute("ALTER TABLE articles ADD COLUMN source_bom_size_bytes INTEGER")
 
 
 def ensure_bom_lines_columns(conn: sqlite3.Connection) -> None:
@@ -189,18 +200,32 @@ def upsert_article(
     title: str | None,
     source_bom_path: str,
     source_bom_filename: str,
+    source_bom_modified_at: str | None = None,
+    source_bom_size_bytes: int | None = None,
 ) -> int:
     conn.execute(
         """
-        INSERT INTO articles(article_number, title, source_bom_filename, source_bom_path, updated_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO articles(
+            article_number, title, source_bom_filename, source_bom_path,
+            source_bom_modified_at, source_bom_size_bytes, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(article_number) DO UPDATE SET
             title=excluded.title,
             source_bom_filename=excluded.source_bom_filename,
             source_bom_path=excluded.source_bom_path,
+            source_bom_modified_at=excluded.source_bom_modified_at,
+            source_bom_size_bytes=excluded.source_bom_size_bytes,
             updated_at=CURRENT_TIMESTAMP
         """,
-        (article_number, title, source_bom_filename, source_bom_path),
+        (
+            article_number,
+            title,
+            source_bom_filename,
+            source_bom_path,
+            source_bom_modified_at,
+            source_bom_size_bytes,
+        ),
     )
     cur = conn.execute("SELECT id FROM articles WHERE article_number=?", (article_number,))
     row = cur.fetchone()

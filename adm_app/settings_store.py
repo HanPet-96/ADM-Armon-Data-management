@@ -12,6 +12,7 @@ class AppSettings:
     theme_mode: str = "light"
     has_seen_help: bool = False
     language: str = "en"
+    developer_mode: bool = False
 
 
 def app_data_dir() -> Path:
@@ -47,9 +48,22 @@ def load_settings(default_data_root: Path, settings_path: Path | None = None) ->
         language = str(payload.get("language", "en")).lower()
         if language not in {"en", "nl"}:
             language = "en"
-        return AppSettings(data_root=data_root, theme_mode=theme_mode, has_seen_help=has_seen_help, language=language)
+        developer_mode = bool(payload.get("developer_mode", False))
+        return AppSettings(
+            data_root=data_root,
+            theme_mode=theme_mode,
+            has_seen_help=has_seen_help,
+            language=language,
+            developer_mode=developer_mode,
+        )
     except Exception:
-        return AppSettings(data_root=str(default_data_root), theme_mode="light", has_seen_help=False, language="en")
+        return AppSettings(
+            data_root=str(default_data_root),
+            theme_mode="light",
+            has_seen_help=False,
+            language="en",
+            developer_mode=False,
+        )
 
 
 def save_settings(settings: AppSettings, settings_path: Path | None = None) -> None:
@@ -62,5 +76,6 @@ def save_settings(settings: AppSettings, settings_path: Path | None = None) -> N
         "theme_mode": theme_mode,
         "has_seen_help": bool(settings.has_seen_help),
         "language": language,
+        "developer_mode": bool(settings.developer_mode),
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

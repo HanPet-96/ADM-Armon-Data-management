@@ -44,27 +44,27 @@
   ('pyiboot01_bootstrap',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\PyInstaller\\loader\\pyiboot01_bootstrap.py',
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PyInstaller\\loader\\pyiboot01_bootstrap.py',
    'PYSOURCE'),
   ('pyi_rth_inspect',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
    'PYSOURCE'),
   ('pyi_rth_pkgutil',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
    'PYSOURCE'),
   ('pyi_rth_multiprocessing',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
    'PYSOURCE'),
   ('pyi_rth_pyside6',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pyside6.py',
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pyside6.py',
    'PYSOURCE'),
   ('run_adm',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
