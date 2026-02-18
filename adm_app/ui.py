@@ -1143,7 +1143,7 @@ class MainWindow(QMainWindow):
 
             local_conn = get_connection(db_path)
             try:
-                result["stats"] = run_index(local_conn, data_root=data_root_path)
+                result["stats"] = run_index(local_conn, data_root=data_root_path, force_doc_relink=True)
             except Exception as exc:
                 result["error"] = str(exc)
             finally:

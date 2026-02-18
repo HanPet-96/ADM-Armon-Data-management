@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from adm_app.db import get_connection, init_db, upsert_article, upsert_document, upsert_part
-from adm_app.indexer import find_part_match_with_revision, index_documents, parse_document_part_and_revision
+from adm_app.indexer import find_part_id_from_name, find_part_match_with_revision, index_documents, parse_document_part_and_revision
 
 
 def test_parse_document_part_and_revision():
@@ -70,3 +70,30 @@ def test_index_documents_removes_missing_files(tmp_path):
     paths = {str(row["path"]) for row in rows}
     assert str(current_file.resolve()) in paths
     assert str(stale_file.resolve()) not in paths
+
+
+def test_find_part_from_filename_with_underscore_and_dot(tmp_path):
+    conn = get_connection(tmp_path / "adm_test.db")
+    init_db(conn)
+    part_id = upsert_part(conn, "FRM1822_1.0", "Quality control Leva")
+    conn.commit()
+    found = find_part_id_from_name(conn, "FRM1822_1.0 Quality control Leva.pdf")
+    assert found == part_id
+
+
+def test_find_part_from_manual_description_filename(tmp_path):
+    conn = get_connection(tmp_path / "adm_test.db")
+    init_db(conn)
+    part_id = upsert_part(conn, "DOC-MAN-01", "Manual Leva chair mount")
+    conn.commit()
+    found = find_part_id_from_name(conn, "Manual Leva chair mount (EN NL DE FR) v2 2025.pdf")
+    assert found == part_id
+
+
+def test_find_part_from_description_tokens_any_order(tmp_path):
+    conn = get_connection(tmp_path / "adm_test.db")
+    init_db(conn)
+    part_id = upsert_part(conn, "DOC-LEVA-02", "Quality control Leva chair mount")
+    conn.commit()
+    found = find_part_id_from_name(conn, "Leva mount - quality checklist chair final.pdf")
+    assert found == part_id

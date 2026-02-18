@@ -2061,13 +2061,13 @@
   ('VCRUNTIME140.dll',
    'C:\\Program Files\\Python314\\VCRUNTIME140.dll',
    'BINARY'),
+  ('VCRUNTIME140_1.dll',
+   'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
+   'BINARY'),
   ('shiboken6\\MSVCP140.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\MSVCP140.dll',
-   'BINARY'),
-  ('VCRUNTIME140_1.dll',
-   'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
    'BINARY'),
   ('shiboken6\\MSVCP140_2.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
