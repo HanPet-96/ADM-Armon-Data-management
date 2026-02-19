@@ -24,12 +24,27 @@ set "PYI_SPEC=%PYI_TEMP_ROOT%\spec"
 set "PYI_DIST=%PYI_TEMP_ROOT%\dist"
 set "FINAL_DIST=%CD%\dist\ADM_portable"
 set "FINAL_EXE=%FINAL_DIST%\ADM.exe"
+set "SPLASH_MAX_W=760"
+set "SPLASH_MAX_H=480"
+set "SPLASH_FILE="
 
 if exist "%PYI_TEMP_ROOT%" (
   rmdir /s /q "%PYI_TEMP_ROOT%" >nul 2>nul
 )
 mkdir "%PYI_WORK%" >nul 2>nul
 mkdir "%PYI_SPEC%" >nul 2>nul
+
+if exist "%CD%\Splash.png" (
+  set "SPLASH_BUILD=%PYI_TEMP_ROOT%\splash_for_build.png"
+  call "!PY_EXE!" ".\scripts\resize_splash.py" "%CD%\Splash.png" "!SPLASH_BUILD!" "%SPLASH_MAX_W%" "%SPLASH_MAX_H%" >> "!LOG_FILE!" 2>&1
+  if errorlevel 1 (
+    echo [WARN] Splash preprocessing failed. Falling back to original Splash.png.
+    echo [WARN] Splash preprocessing failed, using original image.>> "!LOG_FILE!"
+    set "SPLASH_FILE=%CD%\Splash.png"
+  ) else (
+    set "SPLASH_FILE=!SPLASH_BUILD!"
+  )
+)
 
 echo [1/3] Installing build dependencies...
 call "!PY_EXE!" -m pip install -r requirements-build.txt >> "!LOG_FILE!" 2>&1
@@ -43,9 +58,17 @@ if errorlevel 1 (
 
 echo [2/3] Running PyInstaller build...
 if exist "%CD%\Icon.ico" (
-  call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --icon "%CD%\Icon.ico" --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+  if defined SPLASH_FILE (
+    call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --collect-all PySide6.QtWebEngineCore --collect-all PySide6.QtWebEngineWidgets --hidden-import PySide6.QtWebEngineCore --hidden-import PySide6.QtWebEngineWidgets --icon "%CD%\Icon.ico" --splash "!SPLASH_FILE!" --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+  ) else (
+    call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --collect-all PySide6.QtWebEngineCore --collect-all PySide6.QtWebEngineWidgets --hidden-import PySide6.QtWebEngineCore --hidden-import PySide6.QtWebEngineWidgets --icon "%CD%\Icon.ico" --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+  )
 ) else (
-  call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+  if defined SPLASH_FILE (
+    call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --collect-all PySide6.QtWebEngineCore --collect-all PySide6.QtWebEngineWidgets --hidden-import PySide6.QtWebEngineCore --hidden-import PySide6.QtWebEngineWidgets --splash "!SPLASH_FILE!" --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+  ) else (
+    call "!PY_EXE!" -m PyInstaller --noconfirm --noconsole --onedir --name ADM --paths . --collect-all PySide6 --collect-all PySide6.QtWebEngineCore --collect-all PySide6.QtWebEngineWidgets --hidden-import PySide6.QtWebEngineCore --hidden-import PySide6.QtWebEngineWidgets --distpath "%PYI_DIST%" --workpath "%PYI_WORK%" --specpath "%PYI_SPEC%" .\run_adm.py >> "!LOG_FILE!" 2>&1
+  )
 )
 if errorlevel 1 (
   echo [ERROR] Build failed.
@@ -80,6 +103,9 @@ if exist "%CD%\RELEASE_CHECKLIST_V1.md" (
 )
 if exist "%CD%\Icon.ico" (
   copy /Y "%CD%\Icon.ico" "!FINAL_DIST!\Icon.ico" >nul
+)
+if exist "%CD%\Splash.png" (
+  copy /Y "%CD%\Splash.png" "!FINAL_DIST!\Splash.png" >nul
 )
 
 echo [4/4] Final checks...

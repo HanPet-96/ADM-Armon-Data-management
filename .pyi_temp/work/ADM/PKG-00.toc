@@ -70,7 +70,12 @@
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\run_adm.py',
-   'PYSOURCE')],
+   'PYSOURCE'),
+  ('Splash-00.res',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\.pyi_temp\\work\\ADM\\Splash-00.res',
+   'SPLASH')],
  'python314.dll',
  True,
  False,

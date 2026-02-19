@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
 from pathlib import Path
 
 from .db import get_connection, init_db
@@ -10,6 +11,7 @@ from .settings_store import (
     AppSettings,
     default_db_path,
     default_log_dir,
+    default_settings_path,
     load_settings,
     save_settings,
 )
@@ -44,9 +46,12 @@ def configure_logging() -> None:
 
 
 def main() -> int:
+    app_started_at = time.monotonic()
     configure_logging()
     args = parse_args()
     defaults_root = default_data_root()
+    settings_path = default_settings_path()
+    first_start = not settings_path.exists()
     settings = load_settings(default_data_root=defaults_root)
     data_root = Path(args.data_root).resolve() if args.data_root else Path(settings.data_root).resolve()
     if args.data_root:
@@ -57,6 +62,11 @@ def main() -> int:
                 has_seen_help=settings.has_seen_help,
                 language=settings.language,
                 developer_mode=settings.developer_mode,
+                auto_reindex_on_startup=settings.auto_reindex_on_startup,
+                bom_default_expand_all=settings.bom_default_expand_all,
+                search_in_children=settings.search_in_children,
+                order_export_path=settings.order_export_path,
+                pdf_preview_engine=settings.pdf_preview_engine,
             )
         )
     db_path = Path(args.db_path).resolve() if args.db_path else default_db_path()
@@ -77,6 +87,13 @@ def main() -> int:
         has_seen_help=settings.has_seen_help,
         language=settings.language,
         developer_mode=settings.developer_mode,
+        auto_reindex_on_startup=settings.auto_reindex_on_startup,
+        bom_default_expand_all=settings.bom_default_expand_all,
+        search_in_children=settings.search_in_children,
+        order_export_path=settings.order_export_path,
+        pdf_preview_engine=settings.pdf_preview_engine,
+        force_datastruct_on_first_start=first_start,
+        splash_started_at=app_started_at,
     )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import time
 import os
 from pathlib import Path
 import re
@@ -12,13 +13,15 @@ import threading
 import zipfile
 from openpyxl import Workbook, load_workbook
 
-from PySide6.QtCore import QEasingCurve, QPointF, Property, QPropertyAnimation, QRect, QRectF, QSize, QTimer, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPalette
+from PySide6.QtCore import QEasingCurve, QPointF, Property, QPropertyAnimation, QRect, QRectF, QSize, QTimer, Qt, QUrl
+from PySide6.QtGui import QColor, QCursor, QIcon, QPainter, QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QFileDialog,
     QComboBox,
+    QFormLayout,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -36,6 +39,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
+    QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -49,7 +53,7 @@ from .excel_parser import detect_header
 from .i18n import normalize_language, tr
 from .indexer import parse_document_part_and_revision, run_index
 from .mapping import parse_qty
-from .settings_store import AppSettings, save_settings
+from .settings_store import AppSettings, app_data_dir, save_settings
 from .search import (
     get_article,
     get_article_by_number,
@@ -70,11 +74,24 @@ try:
     from PySide6.QtPdf import QPdfDocument
     from PySide6.QtPdfWidgets import QPdfView
 
-    PDF_PREVIEW_AVAILABLE = True
+    PDF_PREVIEW_QTPDF_AVAILABLE = True
 except Exception:
     QPdfDocument = None  # type: ignore[assignment]
     QPdfView = None  # type: ignore[assignment]
-    PDF_PREVIEW_AVAILABLE = False
+    PDF_PREVIEW_QTPDF_AVAILABLE = False
+
+try:
+    from PySide6.QtWebEngineWidgets import QWebEngineView
+    from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
+
+    PDF_PREVIEW_WEB_AVAILABLE = True
+except Exception:
+    QWebEngineView = None  # type: ignore[assignment]
+    QWebEngineProfile = None  # type: ignore[assignment]
+    QWebEngineSettings = None  # type: ignore[assignment]
+    PDF_PREVIEW_WEB_AVAILABLE = False
+
+PDF_PREVIEW_AVAILABLE = PDF_PREVIEW_WEB_AVAILABLE
 
 
 def resolve_app_icon_path() -> Path | None:
@@ -378,6 +395,11 @@ class SettingsDialog(QDialog):
         language: str,
         developer_mode: bool,
         developer_toggle_available: bool,
+        auto_reindex_on_startup: bool,
+        bom_default_expand_all: bool,
+        search_in_children: bool,
+        order_export_path: str,
+        pdf_preview_engine: str,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -387,47 +409,154 @@ class SettingsDialog(QDialog):
         icon = get_app_icon()
         if icon is not None:
             self.setWindowIcon(icon)
-        self.resize(700, 280)
+        self.resize(840, 520)
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(tr(self.language, "settings_datastruct")))
-        row = QHBoxLayout()
-        self.data_root_input = QLineEdit(data_root)
-        browse_button = QPushButton(tr(self.language, "settings_browse"))
-        browse_button.clicked.connect(self.browse_data_root)
-        row.addWidget(self.data_root_input)
-        row.addWidget(browse_button)
-        layout.addLayout(row)
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(10)
 
-        theme_row = QHBoxLayout()
-        theme_row.addWidget(QLabel(tr(self.language, "settings_dark_mode")))
+        behavior_card = QFrame()
+        behavior_card.setFrameShape(QFrame.Shape.StyledPanel)
+        behavior_layout = QFormLayout(behavior_card)
+        behavior_layout.setContentsMargins(12, 10, 12, 12)
+        behavior_layout.setHorizontalSpacing(16)
+        behavior_layout.setVerticalSpacing(10)
+        behavior_title = QLabel(tr(self.language, "settings_section_behavior"))
+        behavior_title.setStyleSheet("font-weight: 600;")
+        behavior_layout.addRow(behavior_title, QWidget())
+
         self.theme_toggle = ToggleSwitch()
         self.theme_toggle.setChecked(theme_mode.lower() == "dark")
-        theme_row.addWidget(self.theme_toggle)
-        theme_row.addStretch(1)
-        layout.addLayout(theme_row)
+        self._add_setting_row(
+            behavior_layout,
+            tr(self.language, "settings_dark_mode"),
+            tr(self.language, "settings_help_dark_mode"),
+            self.theme_toggle,
+        )
+
+        self.auto_reindex_toggle = ToggleSwitch()
+        self.auto_reindex_toggle.setChecked(bool(auto_reindex_on_startup))
+        self._add_setting_row(
+            behavior_layout,
+            tr(self.language, "settings_auto_reindex_startup"),
+            tr(self.language, "settings_help_auto_reindex_startup"),
+            self.auto_reindex_toggle,
+        )
+
+        self.bom_expand_toggle = ToggleSwitch()
+        self.bom_expand_toggle.setChecked(bool(bom_default_expand_all))
+        self._add_setting_row(
+            behavior_layout,
+            tr(self.language, "settings_bom_expand_default"),
+            tr(self.language, "settings_help_bom_expand_default"),
+            self.bom_expand_toggle,
+        )
+
+        self.search_children_toggle = ToggleSwitch()
+        self.search_children_toggle.setChecked(bool(search_in_children))
+        self._add_setting_row(
+            behavior_layout,
+            tr(self.language, "settings_search_children"),
+            tr(self.language, "settings_help_search_children"),
+            self.search_children_toggle,
+        )
+
+        self.pdf_engine_combo = QComboBox()
+        self.pdf_engine_combo.addItem(tr(self.language, "settings_pdf_engine_web"), "web")
+        self.pdf_engine_combo.addItem(tr(self.language, "settings_pdf_engine_qtpdf"), "qtpdf")
+        current_engine = "qtpdf" if str(pdf_preview_engine or "").lower().strip() == "qtpdf" else "web"
+        idx = self.pdf_engine_combo.findData(current_engine)
+        self.pdf_engine_combo.setCurrentIndex(0 if idx < 0 else idx)
+        self._add_setting_row(
+            behavior_layout,
+            tr(self.language, "settings_pdf_engine"),
+            tr(self.language, "settings_help_pdf_engine"),
+            self.pdf_engine_combo,
+        )
+
+        self.developer_toggle: ToggleSwitch | None = None
+        if self.developer_toggle_available:
+            self.developer_toggle = ToggleSwitch()
+            self.developer_toggle.setChecked(bool(developer_mode))
+            self._add_setting_row(
+                behavior_layout,
+                tr(self.language, "settings_developer_mode"),
+                tr(self.language, "settings_help_developer_mode"),
+                self.developer_toggle,
+            )
+
+        layout.addWidget(behavior_card)
+
+        language_card = QFrame()
+        language_card.setFrameShape(QFrame.Shape.StyledPanel)
+        language_layout = QFormLayout(language_card)
+        language_layout.setContentsMargins(12, 10, 12, 12)
+        language_layout.setHorizontalSpacing(16)
+        language_layout.setVerticalSpacing(10)
+        language_title = QLabel(tr(self.language, "settings_section_language"))
+        language_title.setStyleSheet("font-weight: 600;")
+        language_layout.addRow(language_title, QWidget())
 
         language_row = QHBoxLayout()
-        language_row.addWidget(QLabel(tr(self.language, "settings_language")))
+        language_row.setSpacing(8)
         self.language_combo = QComboBox()
         self.language_combo.addItem(tr(self.language, "lang_name_en"), "en")
         self.language_combo.addItem(tr(self.language, "lang_name_nl"), "nl")
         current_idx = 1 if self.language == "nl" else 0
         self.language_combo.setCurrentIndex(current_idx)
+        self.language_combo.setMinimumWidth(160)
         language_row.addWidget(self.language_combo)
         language_row.addStretch(1)
-        layout.addLayout(language_row)
+        self._add_setting_row(
+            language_layout,
+            tr(self.language, "settings_language"),
+            tr(self.language, "settings_help_language"),
+            self._wrap_row_layout(language_row),
+        )
+        layout.addWidget(language_card)
 
-        self.developer_toggle: ToggleSwitch | None = None
-        if self.developer_toggle_available:
-            dev_row = QHBoxLayout()
-            dev_row.addWidget(QLabel(tr(self.language, "settings_developer_mode")))
-            self.developer_toggle = ToggleSwitch()
-            self.developer_toggle.setChecked(bool(developer_mode))
-            dev_row.addWidget(self.developer_toggle)
-            dev_row.addStretch(1)
-            layout.addLayout(dev_row)
+        path_card = QFrame()
+        path_card.setFrameShape(QFrame.Shape.StyledPanel)
+        path_layout = QFormLayout(path_card)
+        path_layout.setContentsMargins(12, 10, 12, 12)
+        path_layout.setHorizontalSpacing(16)
+        path_layout.setVerticalSpacing(10)
+        path_title = QLabel(tr(self.language, "settings_section_paths"))
+        path_title.setStyleSheet("font-weight: 600;")
+        path_layout.addRow(path_title, QWidget())
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        self.data_root_input = QLineEdit(data_root)
+        browse_button = QPushButton(tr(self.language, "settings_browse"))
+        browse_button.clicked.connect(self.browse_data_root)
+        row.addWidget(self.data_root_input)
+        row.addWidget(browse_button)
+        self._add_setting_row(
+            path_layout,
+            tr(self.language, "settings_datastruct"),
+            tr(self.language, "settings_help_datastruct"),
+            self._wrap_row_layout(row),
+        )
+
+        export_row = QHBoxLayout()
+        export_row.setSpacing(8)
+        self.order_export_input = QLineEdit(str(order_export_path or ""))
+        export_browse_button = QPushButton(tr(self.language, "settings_browse"))
+        export_browse_button.clicked.connect(self.browse_export_root)
+        export_row.addWidget(self.order_export_input)
+        export_row.addWidget(export_browse_button)
+        self._add_setting_row(
+            path_layout,
+            tr(self.language, "settings_export_path"),
+            tr(self.language, "settings_help_export_path"),
+            self._wrap_row_layout(export_row),
+        )
+        layout.addWidget(path_card)
+
+        layout.addStretch(1)
 
         actions = QHBoxLayout()
+        actions.setSpacing(8)
         self.check_updates_button = QPushButton(tr(self.language, "settings_check_updates"))
         save_button = QPushButton(tr(self.language, "settings_save"))
         cancel_button = QPushButton(tr(self.language, "settings_cancel"))
@@ -439,6 +568,48 @@ class SettingsDialog(QDialog):
         actions.addWidget(save_button)
         actions.addWidget(cancel_button)
         layout.addLayout(actions)
+
+    def _wrap_row_layout(self, row_layout: QHBoxLayout) -> QWidget:
+        widget = QWidget()
+        widget.setLayout(row_layout)
+        return widget
+
+    def _make_help_button(self, tooltip: str) -> QToolButton:
+        button = QToolButton()
+        button.setText("?")
+        button.setAutoRaise(False)
+        button.setToolTip(tooltip)
+        button.setStatusTip(tooltip)
+        button.setWhatsThis(tooltip)
+        button.setFixedSize(18, 18)
+        button.setStyleSheet(
+            """
+            QToolButton {
+                border: 1px solid #9CA3AF;
+                border-radius: 9px;
+                font-weight: 700;
+                padding: 0px;
+            }
+            """
+        )
+        button.enterEvent = lambda event, b=button, t=tooltip: self._show_help_tooltip(event, b, t)  # type: ignore[method-assign]
+        return button
+
+    def _show_help_tooltip(self, event, button: QToolButton, tooltip: str) -> None:
+        from PySide6.QtWidgets import QToolTip
+
+        QToolTip.showText(QCursor.pos(), tooltip, button)
+        QToolButton.enterEvent(button, event)
+
+    def _add_setting_row(self, form: QFormLayout, label: str, tooltip: str, control: QWidget) -> None:
+        left = QWidget()
+        left_layout = QHBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(6)
+        left_layout.addWidget(QLabel(label))
+        left_layout.addWidget(self._make_help_button(tooltip))
+        left_layout.addStretch(1)
+        form.addRow(left, control)
 
     def browse_data_root(self) -> None:
         selected = QFileDialog.getExistingDirectory(
@@ -452,6 +623,9 @@ class SettingsDialog(QDialog):
     def selected_data_root(self) -> str:
         return self.data_root_input.text().strip()
 
+    def selected_order_export_path(self) -> str:
+        return self.order_export_input.text().strip()
+
     def selected_theme_mode(self) -> str:
         return "dark" if self.theme_toggle.isChecked() else "light"
 
@@ -462,6 +636,28 @@ class SettingsDialog(QDialog):
         if self.developer_toggle is None:
             return False
         return bool(self.developer_toggle.isChecked())
+
+    def selected_auto_reindex_on_startup(self) -> bool:
+        return bool(self.auto_reindex_toggle.isChecked())
+
+    def selected_bom_default_expand_all(self) -> bool:
+        return bool(self.bom_expand_toggle.isChecked())
+
+    def selected_search_in_children(self) -> bool:
+        return bool(self.search_children_toggle.isChecked())
+
+    def selected_pdf_preview_engine(self) -> str:
+        value = str(self.pdf_engine_combo.currentData() or "web").lower().strip()
+        return value if value in {"web", "qtpdf"} else "web"
+
+    def browse_export_root(self) -> None:
+        selected = QFileDialog.getExistingDirectory(
+            self,
+            tr(self.language, "settings_export_path"),
+            self.order_export_input.text(),
+        )
+        if selected:
+            self.order_export_input.setText(selected)
 
     def check_for_updates_clicked(self) -> None:
         latest = fetch_latest_github_release()
@@ -507,6 +703,12 @@ class MainWindow(QMainWindow):
         has_seen_help: bool = False,
         language: str = "en",
         developer_mode: bool = False,
+        auto_reindex_on_startup: bool = True,
+        bom_default_expand_all: bool = False,
+        search_in_children: bool = True,
+        order_export_path: str = "",
+        pdf_preview_engine: str = "web",
+        suppress_initial_help: bool = False,
     ) -> None:
         super().__init__()
         self.conn = conn
@@ -515,6 +717,14 @@ class MainWindow(QMainWindow):
         self.has_seen_help = has_seen_help
         self.language = normalize_language(language)
         self.developer_mode = bool(developer_mode)
+        self.auto_reindex_on_startup = bool(auto_reindex_on_startup)
+        self.bom_default_expand_all = bool(bom_default_expand_all)
+        self.search_in_children = bool(search_in_children)
+        self.order_export_path = str(order_export_path or "")
+        self.pdf_preview_engine = str(pdf_preview_engine or "web").lower().strip()
+        if self.pdf_preview_engine not in {"web", "qtpdf"}:
+            self.pdf_preview_engine = "web"
+        self.suppress_initial_help = bool(suppress_initial_help)
         self.developer_toggle_available = os.getenv("COMPUTERNAME", "").strip().lower() in {
             "laptop-han",
             "rendlaptop",
@@ -531,6 +741,9 @@ class MainWindow(QMainWindow):
         self.current_pdf_path = ""
         self.current_pdf_page = 0
         self.current_pdf_page_count = 0
+        self._pdf_resize_timer = QTimer(self)
+        self._pdf_resize_timer.setSingleShot(True)
+        self._pdf_resize_timer.timeout.connect(self._refresh_pdf_fit)
         self.order_cart: dict[str, dict[str, object]] = {}
         self.order_drawer_open = False
         self.order_drawer_width = 380
@@ -561,8 +774,8 @@ class MainWindow(QMainWindow):
         top_actions.addWidget(self.help_button)
         root_layout.addLayout(top_actions)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        root_layout.addWidget(splitter)
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        root_layout.addWidget(self.main_splitter)
 
         left_area = QWidget()
         left_area_layout = QVBoxLayout(left_area)
@@ -574,7 +787,7 @@ class MainWindow(QMainWindow):
         left_controls.addWidget(self.search_input, 1)
         left_controls.addWidget(self.search_button)
         left_area_layout.addLayout(left_controls)
-        splitter.addWidget(left_area)
+        self.main_splitter.addWidget(left_area)
 
         self.article_table = QTableWidget(0, 2)
         self.article_table.setHorizontalHeaderLabels(
@@ -588,17 +801,13 @@ class MainWindow(QMainWindow):
         self.article_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         left_area_layout.addWidget(self.article_table)
 
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        self.article_title_label = QLabel(tr(self.language, "lbl_select_article"))
-        right_layout.addWidget(self.article_title_label)
-
-        self.right_content_splitter = QSplitter(Qt.Orientation.Vertical)
-        right_layout.addWidget(self.right_content_splitter)
-
         bom_container = QWidget()
         bom_layout = QVBoxLayout(bom_container)
         bom_layout.setContentsMargins(0, 0, 0, 0)
+        self.article_title_label = QLabel(tr(self.language, "lbl_select_article"))
+        self.article_title_label.setWordWrap(True)
+        self.article_title_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        bom_layout.addWidget(self.article_title_label)
         bom_controls = QHBoxLayout()
         self.expand_all_button = QPushButton(tr(self.language, "btn_expand_all"))
         self.collapse_all_button = QPushButton(tr(self.language, "btn_collapse_all"))
@@ -629,8 +838,9 @@ class MainWindow(QMainWindow):
                 tr(self.language, "bom_col_status"),
             ]
         )
-        self.bom_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.bom_tree.header().setStretchLastSection(True)
+        self.bom_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        self.bom_tree.header().setStretchLastSection(False)
+        self.bom_tree.setMinimumWidth(0)
         self.bom_tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         if self.developer_mode:
             self.bom_tree.setEditTriggers(
@@ -641,28 +851,26 @@ class MainWindow(QMainWindow):
         else:
             self.bom_tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         bom_layout.addWidget(self.bom_tree)
-        self.right_content_splitter.addWidget(bom_container)
+        bom_container.setMinimumWidth(0)
 
-        docs_area = QWidget()
-        docs_area_layout = QVBoxLayout(docs_area)
-        docs_area_layout.setContentsMargins(0, 0, 0, 0)
-        self.docs_context_label = QLabel(tr(self.language, "lbl_docs_article"))
-        self.docs_context_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        docs_area_layout.addWidget(self.docs_context_label)
-
-        docs_preview_splitter = QSplitter(Qt.Orientation.Horizontal)
-        docs_area_layout.addWidget(docs_preview_splitter)
-        docs_area_layout.setStretch(1, 1)
-        self.right_content_splitter.addWidget(docs_area)
-        self.right_content_splitter.setStretchFactor(0, 1)
-        self.right_content_splitter.setStretchFactor(1, 1)
+        docs_preview_area = QWidget()
+        docs_preview_layout = QVBoxLayout(docs_preview_area)
+        docs_preview_layout.setContentsMargins(0, 0, 0, 0)
+        self.docs_preview_splitter = QSplitter(Qt.Orientation.Vertical)
+        docs_preview_layout.addWidget(self.docs_preview_splitter)
+        docs_preview_area.setMinimumWidth(0)
 
         docs_list_container = QWidget()
         docs_list_layout = QVBoxLayout(docs_list_container)
         docs_list_layout.setContentsMargins(0, 0, 0, 0)
+        self.docs_context_label = QLabel(tr(self.language, "lbl_docs_article"))
+        self.docs_context_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.docs_context_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        docs_list_layout.addWidget(self.docs_context_label)
         self.docs_list = QListWidget()
         docs_list_layout.addWidget(self.docs_list)
-        docs_preview_splitter.addWidget(docs_list_container)
+        docs_list_container.setMinimumWidth(0)
+        self.docs_preview_splitter.addWidget(docs_list_container)
 
         preview_container = QWidget()
         preview_layout = QVBoxLayout(preview_container)
@@ -670,19 +878,6 @@ class MainWindow(QMainWindow):
         preview_title = QLabel(tr(self.language, "lbl_pdf_preview"))
         preview_title.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         preview_layout.addWidget(preview_title)
-        self.preview_controls_row = QHBoxLayout()
-        self.preview_prev_button = QPushButton("<")
-        self.preview_next_button = QPushButton(">")
-        self.preview_page_label = QLabel("-")
-        self.preview_page_hint = QLabel("")
-        self.preview_prev_button.clicked.connect(self.preview_prev_page)
-        self.preview_next_button.clicked.connect(self.preview_next_page)
-        self.preview_controls_row.addWidget(self.preview_prev_button)
-        self.preview_controls_row.addWidget(self.preview_next_button)
-        self.preview_controls_row.addWidget(self.preview_page_label)
-        self.preview_controls_row.addStretch(1)
-        self.preview_controls_row.addWidget(self.preview_page_hint)
-        preview_layout.addLayout(self.preview_controls_row)
         self.preview_stack = QStackedWidget()
         self.preview_message = QLabel(tr(self.language, "lbl_preview_default"))
         self.preview_message.setWordWrap(True)
@@ -691,23 +886,47 @@ class MainWindow(QMainWindow):
         self.preview_stack.addWidget(self.preview_message)
         self.pdf_document = None
         self.pdf_view = None
-        if PDF_PREVIEW_AVAILABLE:
+        self.web_pdf_view = None
+        if self.pdf_preview_engine == "qtpdf":
+            self._use_qtpdf = PDF_PREVIEW_QTPDF_AVAILABLE
+            self._use_web_pdf = not self._use_qtpdf and PDF_PREVIEW_WEB_AVAILABLE
+        else:
+            self._use_web_pdf = PDF_PREVIEW_WEB_AVAILABLE
+            self._use_qtpdf = not self._use_web_pdf and PDF_PREVIEW_QTPDF_AVAILABLE
+
+        if self._use_web_pdf:
+            try:
+                profile = QWebEngineProfile.defaultProfile()  # type: ignore[union-attr]
+                settings = profile.settings()
+                settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, True)  # type: ignore[union-attr]
+                if hasattr(QWebEngineSettings.WebAttribute, "PdfViewerEnabled"):  # type: ignore[union-attr]
+                    settings.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, True)  # type: ignore[union-attr]
+            except Exception:
+                pass
+            self.web_pdf_view = QWebEngineView()
+            self.web_pdf_view.setMinimumWidth(0)
+            self.web_pdf_view.loadFinished.connect(self._on_web_pdf_load_finished)
+            self.preview_stack.addWidget(self.web_pdf_view)
+        elif self._use_qtpdf and QPdfDocument is not None and QPdfView is not None:
             self.pdf_document = QPdfDocument(self)
             self.pdf_view = QPdfView()
             self.pdf_view.setDocument(self.pdf_document)
-            self.pdf_view.setPageMode(QPdfView.PageMode.SinglePage)
             self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitInView)
-            self.pdf_view.verticalScrollBar().setValue(0)
-            self.pdf_view.horizontalScrollBar().setValue(0)
             self.preview_stack.addWidget(self.pdf_view)
         preview_layout.addWidget(self.preview_stack)
-        docs_preview_splitter.addWidget(preview_container)
-        docs_preview_splitter.setStretchFactor(0, 2)
-        docs_preview_splitter.setStretchFactor(1, 3)
+        preview_container.setMinimumWidth(0)
+        self.docs_preview_splitter.addWidget(preview_container)
+        self.docs_preview_splitter.setStretchFactor(0, 1)
+        self.docs_preview_splitter.setStretchFactor(1, 1)
 
-        splitter.addWidget(right)
-        splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 3)
+        self.main_splitter.addWidget(bom_container)
+        self.main_splitter.addWidget(docs_preview_area)
+        self.main_splitter.setChildrenCollapsible(True)
+        self.main_splitter.setStretchFactor(0, 2)
+        self.main_splitter.setStretchFactor(1, 3)
+        self.main_splitter.setStretchFactor(2, 3)
+        self.main_splitter.setSizes([340, 520, 620])
+        self.main_splitter.splitterMoved.connect(self._on_main_splitter_moved)
 
         self.order_backdrop = BackdropWidget(self.close_order_drawer, root)
         self.order_backdrop.setObjectName("orderBackdrop")
@@ -773,11 +992,21 @@ class MainWindow(QMainWindow):
         self.apply_translations()
         self.refresh_articles()
         QTimer.singleShot(0, self._set_initial_split_sizes)
+        QTimer.singleShot(0, self._resize_bom_columns_to_fit)
         QTimer.singleShot(0, self.layout_order_drawer)
         self.apply_theme(self.theme_mode)
-        if not self.has_seen_help:
+        if not self.has_seen_help and not self.suppress_initial_help:
             QTimer.singleShot(250, self.open_help_manual_first_run)
         QTimer.singleShot(900, self.check_for_updates)
+
+    def prewarm_pdf_engine(self) -> None:
+        """Warm up WebEngine process early to reduce first-PDF UI flicker."""
+        if not self._use_web_pdf or self.web_pdf_view is None:
+            return
+        try:
+            self.web_pdf_view.setUrl(QUrl("about:blank"))
+        except Exception:
+            pass
 
     def apply_translations(self) -> None:
         self.setWindowTitle(tr(self.language, "window_title", version=__version__))
@@ -797,7 +1026,6 @@ class MainWindow(QMainWindow):
         self.save_bom_button.setText(tr(self.language, "btn_save_bom"))
         self.docs_context_label.setText(tr(self.language, "lbl_docs_article"))
         self.preview_message.setText(tr(self.language, "lbl_preview_default"))
-        self.preview_page_hint.setText("")
         self.close_order_drawer_button.setText(tr(self.language, "btn_close"))
         self.export_order_button.setText(tr(self.language, "btn_export_xlsx_zip"))
         self.clear_order_button.setText(tr(self.language, "btn_clear"))
@@ -832,7 +1060,7 @@ class MainWindow(QMainWindow):
 
     def refresh_articles(self) -> None:
         self.active_search_term = self.search_input.text().strip()
-        rows = list_articles(self.conn, self.active_search_term)
+        rows = list_articles(self.conn, self.active_search_term, search_in_children=self.search_in_children)
         self.article_table.setRowCount(len(rows))
         for row_idx, row in enumerate(rows):
             article_item = QTableWidgetItem(row["article_number"])
@@ -945,8 +1173,13 @@ class MainWindow(QMainWindow):
                 items_by_item_no[item_no] = tree_item
             all_items.append(tree_item)
 
-        self.bom_tree.collapseAll()
-        root_item.setExpanded(True)
+        if self.bom_default_expand_all:
+            for idx in range(root_item.childCount()):
+                self._set_expanded_recursive(root_item.child(idx), True)
+            root_item.setExpanded(True)
+        else:
+            self.bom_tree.collapseAll()
+            root_item.setExpanded(True)
         self.load_article_documents(article_id)
         selected_item = self.find_bom_item_for_search(all_items, self.active_search_term) or first_item
         if selected_item is not None:
@@ -1041,15 +1274,67 @@ class MainWindow(QMainWindow):
             current = current.parent()
 
     def _set_initial_split_sizes(self) -> None:
-        total_height = self.right_content_splitter.height()
+        total_height = self.docs_preview_splitter.height()
         if total_height <= 0:
-            self.right_content_splitter.setSizes([1, 1])
+            self.docs_preview_splitter.setSizes([3, 7])
             return
-        half = max(1, total_height // 2)
-        self.right_content_splitter.setSizes([half, half])
+        docs_h = max(1, int(total_height * 0.30))
+        preview_h = max(1, total_height - docs_h)
+        self.docs_preview_splitter.setSizes([docs_h, preview_h])
+        self._resize_bom_columns_to_fit()
+
+    def _on_main_splitter_moved(self, _pos: int, _index: int) -> None:
+        self._resize_bom_columns_to_fit()
+
+    def _resize_bom_columns_to_fit(self) -> None:
+        header = self.bom_tree.header()
+        if self.bom_tree.columnCount() != 9 or header is None:
+            return
+
+        # Base distribution; scale down proportionally when space is tight.
+        base_widths = [90, 130, 55, 260, 95, 90, 65, 80, 90]  # item, part, rev, desc, material, finish, qty, type, status
+        available = max(0, self.bom_tree.viewport().width() - 4)
+        base_sum = sum(base_widths)
+
+        if available <= 0:
+            widths = [0] * len(base_widths)
+        elif available < base_sum:
+            scale = available / float(base_sum)
+            # allow very small widths so pane can effectively collapse
+            widths = [max(8, int(w * scale)) for w in base_widths]
+        else:
+            widths = list(base_widths)
+            extra = available - base_sum
+            widths[3] += int(extra * 0.65)  # description gets most extra room
+            widths[1] += int(extra * 0.20)
+            widths[4] += int(extra * 0.08)
+            widths[5] += int(extra * 0.07)
+
+        for idx, width in enumerate(widths):
+            self.bom_tree.setColumnWidth(idx, width)
+
+    def _build_pdf_url(self, path: str, page_zero_based: int) -> QUrl:
+        url = QUrl.fromLocalFile(path)
+        # Keep PDF UI chrome minimized and force fit-to-page behavior.
+        url.setFragment(
+            f"page={max(1, int(page_zero_based) + 1)}&zoom=page-fit&view=Fit&navpanes=0&toolbar=0&statusbar=0"
+        )
+        return url
+
+    def _refresh_pdf_fit(self) -> None:
+        if not self.current_pdf_path:
+            return
+        if self._use_web_pdf and self.web_pdf_view is not None:
+            self.web_pdf_view.setUrl(self._build_pdf_url(self.current_pdf_path, self.current_pdf_page))
+            return
+        if self._use_qtpdf and self.pdf_view is not None:
+            self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitInView)
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
+        self._resize_bom_columns_to_fit()
+        if self.current_pdf_path:
+            self._pdf_resize_timer.start(120)
         self.layout_order_drawer()
 
     def showEvent(self, event) -> None:  # type: ignore[override]
@@ -1139,10 +1424,11 @@ class MainWindow(QMainWindow):
         db_path = Path(str(db_row["file"] if db_row and "file" in db_row.keys() else "")).resolve()
 
         def _index_in_background() -> None:
-            from .db import get_connection
+            from .db import get_connection, init_db
 
             local_conn = get_connection(db_path)
             try:
+                init_db(local_conn)
                 result["stats"] = run_index(local_conn, data_root=data_root_path, force_doc_relink=True)
             except Exception as exc:
                 result["error"] = str(exc)
@@ -1680,9 +1966,12 @@ class MainWindow(QMainWindow):
         if not self.order_cart:
             QMessageBox.information(self, tr(self.language, "order_title"), tr(self.language, "order_export_empty"))
             return
-        target_root = QFileDialog.getExistingDirectory(self, tr(self.language, "order_export_select_folder"))
-        if not target_root:
-            return
+        configured_export = Path(str(self.order_export_path or "")).expanduser()
+        if configured_export.exists() and configured_export.is_dir():
+            target_root = str(configured_export.resolve())
+        else:
+            target_root = str((Path.home() / "Documents" / "ADM-Export").resolve())
+            Path(target_root).mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         bundle_name = f"ADM_Order_{timestamp}"
         bundle_dir = Path(target_root) / bundle_name
@@ -1944,6 +2233,11 @@ class MainWindow(QMainWindow):
             self.language,
             developer_mode=self.developer_mode,
             developer_toggle_available=self.developer_toggle_available,
+            auto_reindex_on_startup=self.auto_reindex_on_startup,
+            bom_default_expand_all=self.bom_default_expand_all,
+            search_in_children=self.search_in_children,
+            order_export_path=self.order_export_path,
+            pdf_preview_engine=self.pdf_preview_engine,
             parent=self,
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -1960,6 +2254,11 @@ class MainWindow(QMainWindow):
         self.theme_mode = dlg.selected_theme_mode()
         self.language = dlg.selected_language()
         self.developer_mode = dlg.selected_developer_mode() if self.developer_toggle_available else False
+        self.auto_reindex_on_startup = dlg.selected_auto_reindex_on_startup()
+        self.bom_default_expand_all = dlg.selected_bom_default_expand_all()
+        self.search_in_children = dlg.selected_search_in_children()
+        self.order_export_path = dlg.selected_order_export_path()
+        self.pdf_preview_engine = dlg.selected_pdf_preview_engine()
         save_settings(
             AppSettings(
                 data_root=self.data_root,
@@ -1967,6 +2266,11 @@ class MainWindow(QMainWindow):
                 has_seen_help=self.has_seen_help,
                 language=self.language,
                 developer_mode=self.developer_mode,
+                auto_reindex_on_startup=self.auto_reindex_on_startup,
+                bom_default_expand_all=self.bom_default_expand_all,
+                search_in_children=self.search_in_children,
+                order_export_path=self.order_export_path,
+                pdf_preview_engine=self.pdf_preview_engine,
             )
         )
         self.apply_translations()
@@ -1983,6 +2287,7 @@ class MainWindow(QMainWindow):
             self._bom_dirty = False
             self.save_bom_button.setVisible(False)
         self.revision_suggest_button.setVisible(self.developer_mode)
+        self.refresh_articles()
         if str(previous_data_root).strip().lower() != str(self.data_root).strip().lower():
             self.reindex()
 
@@ -1995,47 +2300,29 @@ class MainWindow(QMainWindow):
         self.update_preview_controls()
 
     def update_preview_controls(self) -> None:
-        if self.current_pdf_page_count <= 0:
-            self.preview_prev_button.setEnabled(False)
-            self.preview_next_button.setEnabled(False)
-            self.preview_page_label.setText("-")
-            self.preview_page_hint.setText("")
-            return
-        self.preview_prev_button.setEnabled(self.current_pdf_page > 0)
-        self.preview_next_button.setEnabled(self.current_pdf_page < self.current_pdf_page_count - 1)
-        self.preview_page_label.setText(
-            tr(
-                self.language,
-                "preview_page_label",
-                page=self.current_pdf_page + 1,
-                count=self.current_pdf_page_count,
-            )
-        )
-        if self.current_pdf_page_count > 1:
-            self.preview_page_hint.setText(tr(self.language, "preview_multi_page"))
-        else:
-            self.preview_page_hint.setText("")
+        return
 
     def preview_prev_page(self) -> None:
-        if self.current_pdf_page_count <= 0:
-            return
-        self.set_pdf_page(self.current_pdf_page - 1)
+        return
 
     def preview_next_page(self) -> None:
-        if self.current_pdf_page_count <= 0:
-            return
-        self.set_pdf_page(self.current_pdf_page + 1)
+        return
 
     def set_pdf_page(self, page: int) -> None:
-        if self.pdf_view is None or self.current_pdf_page_count <= 0:
+        if not self.current_pdf_path:
             return
-        page_safe = max(0, min(int(page), self.current_pdf_page_count - 1))
+        if self.current_pdf_page_count > 0:
+            page_safe = max(0, min(int(page), self.current_pdf_page_count - 1))
+        else:
+            page_safe = max(0, int(page))
         self.current_pdf_page = page_safe
-        navigator = self.pdf_view.pageNavigator()
-        try:
-            navigator.jump(page_safe, QPointF(), 0.0)
-        except TypeError:
-            navigator.jump(page_safe, QPointF())
+        if self._use_web_pdf and self.web_pdf_view is not None:
+            self.web_pdf_view.setUrl(self._build_pdf_url(self.current_pdf_path, self.current_pdf_page))
+            self.preview_stack.setCurrentWidget(self.web_pdf_view)
+        elif self._use_qtpdf and self.pdf_document is not None and self.pdf_view is not None:
+            self.pdf_view.pageNavigator().jump(int(self.current_pdf_page))
+            self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitInView)
+            self.preview_stack.setCurrentWidget(self.pdf_view)
         self.update_preview_controls()
 
     def preview_first_pdf_in_list(self) -> None:
@@ -2058,31 +2345,36 @@ class MainWindow(QMainWindow):
             return
         self.preview_pdf(path)
 
+    def _on_web_pdf_load_finished(self, ok: bool) -> None:
+        if ok:
+            return
+        if self.current_pdf_path:
+            self.set_preview_message(tr(self.language, "preview_failed_load_generic"))
+
     def preview_pdf(self, path: str) -> None:
         if not path:
             self.set_preview_message(tr(self.language, "preview_no_selected"))
             return
-        if not PDF_PREVIEW_AVAILABLE or self.pdf_document is None or self.pdf_view is None:
+        if self._use_web_pdf and self.web_pdf_view is None:
             self.set_preview_message(tr(self.language, "preview_component_missing"))
             return
-        load_result = self.pdf_document.load(path)
-        no_error = getattr(QPdfDocument.Error, "None_", None)
-        if no_error is None:
-            no_error = getattr(QPdfDocument.Error, "NoError", None)
-        if no_error is not None and load_result != no_error:
-            self.set_preview_message(tr(self.language, "preview_failed_load", result=load_result))
+        if self._use_qtpdf and (self.pdf_document is None or self.pdf_view is None):
+            self.set_preview_message(tr(self.language, "preview_component_missing"))
             return
-        if no_error is None and str(load_result).lower() not in ("error.none", "none", "noerror", "error.noerror"):
-            self.set_preview_message(tr(self.language, "preview_failed_load_generic"))
+        if not self._use_web_pdf and not self._use_qtpdf:
+            self.set_preview_message(tr(self.language, "preview_component_missing"))
             return
         self.current_pdf_path = path
-        self.current_pdf_page_count = int(self.pdf_document.pageCount())
         self.current_pdf_page = 0
-        self.pdf_view.verticalScrollBar().setValue(0)
-        self.pdf_view.horizontalScrollBar().setValue(0)
+        if self._use_qtpdf and self.pdf_document is not None:
+            load_result = self.pdf_document.load(path)
+            if str(load_result) not in {"Error.None_", "Error.None"}:
+                self.set_preview_message(tr(self.language, "preview_failed_load_generic"))
+                return
+            self.current_pdf_page_count = int(self.pdf_document.pageCount())
+        else:
+            self.current_pdf_page_count = -1
         self.set_pdf_page(0)
-        self.preview_stack.setCurrentWidget(self.pdf_view)
-        self.update_preview_controls()
 
     def apply_status_style(self, item: QTreeWidgetItem, status_text: str, column: int) -> None:
         normalized = (status_text or "").strip().lower()
@@ -2120,6 +2412,11 @@ class MainWindow(QMainWindow):
                     has_seen_help=True,
                     language=self.language,
                     developer_mode=self.developer_mode,
+                    auto_reindex_on_startup=self.auto_reindex_on_startup,
+                    bom_default_expand_all=self.bom_default_expand_all,
+                    search_in_children=self.search_in_children,
+                    order_export_path=self.order_export_path,
+                    pdf_preview_engine=self.pdf_preview_engine,
                 )
             )
 
@@ -2247,6 +2544,22 @@ def open_file(path: str) -> None:
     subprocess.run(["xdg-open", path], check=False)
 
 
+def close_pyinstaller_splash(min_visible_seconds: float = 1.0, started_at: float | None = None) -> None:
+    try:
+        import pyi_splash  # type: ignore[import-not-found]
+    except Exception:
+        return
+    if started_at is not None:
+        elapsed = time.monotonic() - float(started_at)
+        remaining = float(min_visible_seconds) - elapsed
+        if remaining > 0:
+            time.sleep(remaining)
+    try:
+        pyi_splash.close()
+    except Exception:
+        return
+
+
 def run_ui(
     conn: sqlite3.Connection,
     data_root: str,
@@ -2254,71 +2567,80 @@ def run_ui(
     has_seen_help: bool = False,
     language: str = "en",
     developer_mode: bool = False,
+    auto_reindex_on_startup: bool = True,
+    bom_default_expand_all: bool = False,
+    search_in_children: bool = True,
+    order_export_path: str = "",
+    pdf_preview_engine: str = "web",
+    force_datastruct_on_first_start: bool = False,
+    splash_started_at: float | None = None,
 ) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     icon = get_app_icon()
     if icon is not None:
         app.setWindowIcon(icon)
     apply_app_theme(theme_mode)
-    startup_dialog = QDialog()
-    startup_dialog.setWindowTitle(tr(language, "startup_reindex_title"))
-    startup_dialog.setModal(True)
-    startup_dialog.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
-    startup_dialog.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
-    startup_dialog.setFixedSize(460, 130)
-    startup_layout = QVBoxLayout(startup_dialog)
-    startup_layout.addWidget(QLabel(tr(language, "startup_reindex_msg")))
-    startup_bar = QProgressBar()
-    startup_bar.setRange(0, 0)
-    startup_layout.addWidget(startup_bar)
-    startup_status = QLabel(tr(language, "startup_reindex_running"))
-    startup_layout.addWidget(startup_status)
+    if auto_reindex_on_startup and not force_datastruct_on_first_start:
+        startup_dialog = QDialog()
+        startup_dialog.setWindowTitle(tr(language, "startup_reindex_title"))
+        startup_dialog.setModal(True)
+        startup_dialog.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
+        startup_dialog.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
+        startup_dialog.setFixedSize(460, 130)
+        startup_layout = QVBoxLayout(startup_dialog)
+        startup_layout.addWidget(QLabel(tr(language, "startup_reindex_msg")))
+        startup_bar = QProgressBar()
+        startup_bar.setRange(0, 0)
+        startup_layout.addWidget(startup_bar)
+        startup_status = QLabel(tr(language, "startup_reindex_running"))
+        startup_layout.addWidget(startup_status)
 
-    startup_result: dict[str, object] = {"stats": None, "error": None, "done": False}
-    db_row = conn.execute("PRAGMA database_list").fetchone()
-    db_path = Path(str(db_row["file"] if db_row and "file" in db_row.keys() else "")).resolve()
-    data_root_path = Path(data_root).resolve()
+        startup_result: dict[str, object] = {"stats": None, "error": None, "done": False}
+        db_row = conn.execute("PRAGMA database_list").fetchone()
+        db_path = Path(str(db_row["file"] if db_row and "file" in db_row.keys() else "")).resolve()
+        data_root_path = Path(data_root).resolve()
 
-    def _index_in_background() -> None:
-        from .db import get_connection
+        def _index_in_background() -> None:
+            from .db import get_connection, init_db
 
-        local_conn = get_connection(db_path)
-        try:
-            startup_result["stats"] = run_index(local_conn, data_root_path)
-        except Exception as exc:
-            startup_result["error"] = str(exc)
-        finally:
-            local_conn.close()
-            startup_result["done"] = True
+            local_conn = get_connection(db_path)
+            try:
+                init_db(local_conn)
+                startup_result["stats"] = run_index(local_conn, data_root_path)
+            except Exception as exc:
+                startup_result["error"] = str(exc)
+            finally:
+                local_conn.close()
+                startup_result["done"] = True
 
-    worker = threading.Thread(target=_index_in_background, daemon=True)
-    worker.start()
+        worker = threading.Thread(target=_index_in_background, daemon=True)
+        worker.start()
 
-    poll_timer = QTimer(startup_dialog)
+        poll_timer = QTimer(startup_dialog)
 
-    def _poll_status() -> None:
-        if not bool(startup_result.get("done")):
-            return
-        poll_timer.stop()
-        if startup_result.get("error"):
-            startup_status.setText(tr(language, "startup_reindex_failed"))
-            startup_dialog.reject()
-            return
-        startup_status.setText(tr(language, "startup_reindex_done"))
-        startup_dialog.accept()
+        def _poll_status() -> None:
+            if not bool(startup_result.get("done")):
+                return
+            poll_timer.stop()
+            if startup_result.get("error"):
+                startup_status.setText(tr(language, "startup_reindex_failed"))
+                startup_dialog.reject()
+                return
+            startup_status.setText(tr(language, "startup_reindex_done"))
+            startup_dialog.accept()
 
-    poll_timer.setInterval(100)
-    poll_timer.timeout.connect(_poll_status)
-    poll_timer.start()
-    startup_dialog.exec()
-    worker.join(timeout=10.0)
+        poll_timer.setInterval(100)
+        poll_timer.timeout.connect(_poll_status)
+        poll_timer.start()
+        startup_dialog.exec()
+        worker.join(timeout=10.0)
 
-    if startup_result["error"]:
-        QMessageBox.warning(
-            None,
-            tr(language, "startup_reindex_error_title"),
-            tr(language, "startup_reindex_error_msg", error=str(startup_result["error"])),
-        )
+        if startup_result["error"]:
+            QMessageBox.warning(
+                None,
+                tr(language, "startup_reindex_error_title"),
+                tr(language, "startup_reindex_error_msg", error=str(startup_result["error"])),
+            )
     win = MainWindow(
         conn,
         data_root=data_root,
@@ -2326,6 +2648,57 @@ def run_ui(
         has_seen_help=has_seen_help,
         language=language,
         developer_mode=developer_mode,
+        auto_reindex_on_startup=auto_reindex_on_startup,
+        bom_default_expand_all=bom_default_expand_all,
+        search_in_children=search_in_children,
+        order_export_path=order_export_path,
+        pdf_preview_engine=pdf_preview_engine,
+        suppress_initial_help=force_datastruct_on_first_start,
     )
-    win.show()
+    win.prewarm_pdf_engine()
+    win.showMaximized()
+    app.processEvents()
+    close_pyinstaller_splash(min_visible_seconds=1.0, started_at=splash_started_at)
+    win.raise_()
+    win.activateWindow()
+    app.processEvents()
+    if force_datastruct_on_first_start:
+        initial_dir = str(Path(data_root).resolve()) if str(data_root).strip() else str(Path.home())
+        selected = QFileDialog.getExistingDirectory(
+            win,
+            tr(language, "startup_datastruct_title"),
+            initial_dir,
+        )
+        if not selected:
+            win.close()
+            try:
+                conn.close()
+            except Exception:
+                pass
+            shutil.rmtree(app_data_dir(), ignore_errors=True)
+            app.quit()
+            return 0
+        data_root = str(Path(selected).resolve())
+        win.data_root = data_root
+        save_settings(
+            AppSettings(
+                data_root=data_root,
+                theme_mode=theme_mode,
+                has_seen_help=win.has_seen_help,
+                language=language,
+                developer_mode=developer_mode,
+                auto_reindex_on_startup=auto_reindex_on_startup,
+                bom_default_expand_all=bom_default_expand_all,
+                search_in_children=search_in_children,
+                order_export_path=order_export_path,
+                pdf_preview_engine=pdf_preview_engine,
+            )
+        )
+        if not win.has_seen_help:
+            QTimer.singleShot(100, win.open_help_manual_first_run)
+        if auto_reindex_on_startup:
+            win.reindex()
+        win.raise_()
+        win.activateWindow()
+        app.processEvents()
     return app.exec()

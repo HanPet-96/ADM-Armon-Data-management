@@ -1779,20 +1779,10 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PySide6\\QtWebSockets.pyd',
    'EXTENSION'),
-  ('PySide6\\QtWebEngineWidgets.pyd',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PySide6\\QtWebEngineWidgets.pyd',
-   'EXTENSION'),
   ('PySide6\\QtWebEngineQuick.pyd',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PySide6\\QtWebEngineQuick.pyd',
-   'EXTENSION'),
-  ('PySide6\\QtWebEngineCore.pyd',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PySide6\\QtWebEngineCore.pyd',
    'EXTENSION'),
   ('PySide6\\QtWebChannel.pyd',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
@@ -2055,24 +2045,34 @@
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PySide6\\Qt3DAnimation.pyd',
    'EXTENSION'),
+  ('PySide6\\QtWebEngineWidgets.pyd',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PySide6\\QtWebEngineWidgets.pyd',
+   'EXTENSION'),
+  ('PySide6\\QtWebEngineCore.pyd',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PySide6\\QtWebEngineCore.pyd',
+   'EXTENSION'),
   ('_sqlite3.pyd',
    'C:\\Program Files\\Python314\\DLLs\\_sqlite3.pyd',
    'EXTENSION'),
-  ('VCRUNTIME140.dll',
-   'C:\\Program Files\\Python314\\VCRUNTIME140.dll',
-   'BINARY'),
   ('VCRUNTIME140_1.dll',
    'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
-   'BINARY'),
-  ('shiboken6\\MSVCP140.dll',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\MSVCP140.dll',
    'BINARY'),
   ('shiboken6\\MSVCP140_2.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\MSVCP140_2.dll',
+   'BINARY'),
+  ('VCRUNTIME140.dll',
+   'C:\\Program Files\\Python314\\VCRUNTIME140.dll',
+   'BINARY'),
+  ('shiboken6\\MSVCP140.dll',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\MSVCP140.dll',
    'BINARY'),
   ('python3.dll', 'C:\\Program Files\\Python314\\python3.dll', 'BINARY'),
   ('shiboken6\\shiboken6.abi3.dll',
@@ -2089,15 +2089,15 @@
   ('libffi-8.dll',
    'C:\\Program Files\\Python314\\DLLs\\libffi-8.dll',
    'BINARY'),
-  ('shiboken6\\VCRUNTIME140.dll',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\VCRUNTIME140.dll',
-   'BINARY'),
   ('shiboken6\\VCRUNTIME140_1.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\VCRUNTIME140_1.dll',
+   'BINARY'),
+  ('shiboken6\\VCRUNTIME140.dll',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\VCRUNTIME140.dll',
    'BINARY'),
   ('sqlite3.dll', 'C:\\Program Files\\Python314\\DLLs\\sqlite3.dll', 'BINARY'),
   ('PySide6\\PySide6_Addons.json',
@@ -18024,4 +18024,31 @@
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.pyi_temp\\work\\ADM\\base_library.zip',
+   'DATA'),
+  ('tcl86t.dll', 'C:\\Program Files\\Python314\\DLLs\\tcl86t.dll', 'BINARY'),
+  ('tk86t.dll', 'C:\\Program Files\\Python314\\DLLs\\tk86t.dll', 'BINARY'),
+  ('zlib1.dll', 'C:\\Program Files\\Python314\\DLLs\\zlib1.dll', 'BINARY'),
+  ('_tcl_data\\init.tcl',
+   'C:\\Program Files\\Python314\\tcl\\tcl8.6\\init.tcl',
+   'DATA'),
+  ('_tk_data\\license.terms',
+   'C:\\Program Files\\Python314\\tcl\\tk8.6\\license.terms',
+   'DATA'),
+  ('_tk_data\\text.tcl',
+   'C:\\Program Files\\Python314\\tcl\\tk8.6\\text.tcl',
+   'DATA'),
+  ('_tk_data\\tk.tcl',
+   'C:\\Program Files\\Python314\\tcl\\tk8.6\\tk.tcl',
+   'DATA'),
+  ('_tk_data\\ttk\\cursors.tcl',
+   'C:\\Program Files\\Python314\\tcl\\tk8.6\\ttk\\cursors.tcl',
+   'DATA'),
+  ('_tk_data\\ttk\\fonts.tcl',
+   'C:\\Program Files\\Python314\\tcl\\tk8.6\\ttk\\fonts.tcl',
+   'DATA'),
+  ('_tk_data\\ttk\\ttk.tcl',
+   'C:\\Program Files\\Python314\\tcl\\tk8.6\\ttk\\ttk.tcl',
+   'DATA'),
+  ('_tk_data\\ttk\\utils.tcl',
+   'C:\\Program Files\\Python314\\tcl\\tk8.6\\ttk\\utils.tcl',
    'DATA')],)

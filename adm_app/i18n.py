@@ -44,11 +44,30 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "article_col_article": "Article",
         "article_col_title": "Title",
         "settings_title": "Settings",
+        "settings_section_behavior": "Behavior",
+        "settings_section_language": "Language",
+        "settings_section_paths": "Paths",
         "settings_datastruct": "Datastruct folder",
+        "settings_export_path": "Order export folder",
         "settings_browse": "Browse...",
         "settings_dark_mode": "Dark mode",
+        "settings_auto_reindex_startup": "Auto re-index on startup",
+        "settings_bom_expand_default": "BOM default: expand all",
+        "settings_search_children": "Search in children",
+        "settings_pdf_engine": "PDF preview engine",
+        "settings_pdf_engine_web": "WebEngine (recommended)",
+        "settings_pdf_engine_qtpdf": "QtPdf",
         "settings_language": "Language",
         "settings_developer_mode": "Developer mode",
+        "settings_help_dark_mode": "Overrides system style with light or dark mode.",
+        "settings_help_auto_reindex_startup": "When enabled, ADM refreshes the index automatically at startup.",
+        "settings_help_bom_expand_default": "When enabled, BOM rows open expanded by default.",
+        "settings_help_search_children": "When enabled, search also matches part numbers and descriptions in BOM children.",
+        "settings_help_pdf_engine": "Choose which embedded PDF preview engine ADM should use.",
+        "settings_help_language": "Changes UI language for the full app.",
+        "settings_help_developer_mode": "Enables developer-only BOM edit/revision tools (restricted by computer name).",
+        "settings_help_datastruct": "Root folder that contains BOMS, PDF, STEP-DXF, OVERIG and SOP.",
+        "settings_help_export_path": "If set to an existing folder, order export uses this path directly without asking.",
         "settings_check_updates": "Check for updates",
         "settings_save": "Save",
         "settings_cancel": "Cancel",
@@ -121,7 +140,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 ## 5) Linked documents and PDF preview
 - Selecting a BOM line loads linked documents.
 - The PDF preview automatically shows the first PDF in the list.
-- If a PDF has multiple pages, use `<` and `>` to navigate pages.
+- Multi-page PDFs can be navigated directly in the embedded viewer.
 
 ## 6) Order list
 - Select a BOM item and click `Add to order`.
@@ -146,6 +165,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "save_bom_missing_file": "Source BOM file was not found.",
         "save_bom_xls_unsupported": "Editing .xls files is not supported. Save as .xlsx first.",
         "startup_reindex_title": "Starting ADM",
+        "startup_datastruct_title": "Select Datastruct folder",
         "startup_reindex_msg": "ADM is updating the local index. Please wait...",
         "startup_reindex_running": "Re-index in progress...",
         "startup_reindex_done": "Re-index complete.",
@@ -207,11 +227,30 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "article_col_article": "Artikel",
         "article_col_title": "Titel",
         "settings_title": "Instellingen",
+        "settings_section_behavior": "Gedrag",
+        "settings_section_language": "Taal",
+        "settings_section_paths": "Paden",
         "settings_datastruct": "Datastruct map",
+        "settings_export_path": "Bestel-exportmap",
         "settings_browse": "Bladeren...",
         "settings_dark_mode": "Donkere modus",
+        "settings_auto_reindex_startup": "Automatisch herindexeren bij opstarten",
+        "settings_bom_expand_default": "BOM standaard: alles uitklappen",
+        "settings_search_children": "Zoeken in children",
+        "settings_pdf_engine": "PDF preview-engine",
+        "settings_pdf_engine_web": "WebEngine (aanbevolen)",
+        "settings_pdf_engine_qtpdf": "QtPdf",
         "settings_language": "Taal",
         "settings_developer_mode": "Developer modus",
+        "settings_help_dark_mode": "Overschrijft systeemstijl met lichte of donkere modus.",
+        "settings_help_auto_reindex_startup": "Als dit aan staat, ververst ADM automatisch de index bij opstarten.",
+        "settings_help_bom_expand_default": "Als dit aan staat, wordt de BOM standaard volledig uitgeklapt.",
+        "settings_help_search_children": "Als dit aan staat, zoekt de zoekbalk ook op partnummers en omschrijvingen in BOM-children.",
+        "settings_help_pdf_engine": "Kies welke ingebouwde PDF-previewengine ADM gebruikt.",
+        "settings_help_language": "Wijzigt de UI-taal voor de hele app.",
+        "settings_help_developer_mode": "Zet developer-tools aan voor BOM bewerken/revisiecheck (alleen op toegestane pc-namen).",
+        "settings_help_datastruct": "Rootmap met BOMS, PDF, STEP-DXF, OVERIG en SOP.",
+        "settings_help_export_path": "Als dit een bestaande map is, exporteert de bestellijst direct hierheen zonder extra dialoog.",
         "settings_check_updates": "Controleer updates",
         "settings_save": "Opslaan",
         "settings_cancel": "Annuleren",
@@ -284,7 +323,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 ## 5) Gekoppelde documenten en PDF-preview
 - Bij selectie van een BOM-regel worden gekoppelde documenten geladen.
 - De PDF-preview toont automatisch de eerste PDF uit de lijst.
-- Bij meerdere pagina's gebruik je `<` en `>` om te bladeren.
+- Bij meerpagina-PDF's kun je direct navigeren in de ingebouwde viewer.
 
 ## 6) Bestellijst
 - Selecteer een BOM-item en klik `Aan bestelling toevoegen`.
@@ -309,6 +348,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "save_bom_missing_file": "Bron-BOM-bestand is niet gevonden.",
         "save_bom_xls_unsupported": "Bewerken van .xls-bestanden wordt niet ondersteund. Sla eerst op als .xlsx.",
         "startup_reindex_title": "ADM starten",
+        "startup_datastruct_title": "Selecteer Datastruct map",
         "startup_reindex_msg": "ADM werkt de lokale index bij. Even geduld...",
         "startup_reindex_running": "Herindexeren bezig...",
         "startup_reindex_done": "Herindexeren voltooid.",

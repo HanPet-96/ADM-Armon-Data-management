@@ -4,13 +4,18 @@ import sqlite3
 
 
 def list_articles(
-    conn: sqlite3.Connection, query: str = "", limit: int = 500, top_level_only: bool = False
+    conn: sqlite3.Connection, query: str = "", limit: int = 500, search_in_children: bool = True
 ) -> list[sqlite3.Row]:
-    _ = top_level_only  # retained for backward compatibility in callers
     if query.strip():
         q = f"%{query.strip()}%"
-        where_clauses = ["(a.article_number LIKE ? OR COALESCE(a.title, '') LIKE ? OR COALESCE(p.part_number, '') LIKE ? OR COALESCE(p.description, '') LIKE ?)"]
-        params: list[object] = [q, q, q, q]
+        if search_in_children:
+            where_clauses = [
+                "(a.article_number LIKE ? OR COALESCE(a.title, '') LIKE ? OR COALESCE(p.part_number, '') LIKE ? OR COALESCE(p.description, '') LIKE ?)"
+            ]
+            params: list[object] = [q, q, q, q]
+        else:
+            where_clauses = ["(a.article_number LIKE ? OR COALESCE(a.title, '') LIKE ?)"]
+            params = [q, q]
         where_sql = " AND ".join(where_clauses)
         params.append(limit)
         return conn.execute(

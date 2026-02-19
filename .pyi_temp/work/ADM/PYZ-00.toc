@@ -1536,6 +1536,11 @@
   ('py_compile',
    'C:\\Program Files\\Python314\\Lib\\py_compile.py',
    'PYMODULE'),
+  ('pyi_splash',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\PyInstaller\\fake-modules\\pyi_splash.py',
+   'PYMODULE'),
   ('queue', 'C:\\Program Files\\Python314\\Lib\\queue.py', 'PYMODULE'),
   ('quopri', 'C:\\Program Files\\Python314\\Lib\\quopri.py', 'PYMODULE'),
   ('random', 'C:\\Program Files\\Python314\\Lib\\random.py', 'PYMODULE'),
