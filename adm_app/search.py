@@ -184,3 +184,78 @@ def get_unlinked_documents(conn: sqlite3.Connection, limit: int = 500) -> list[s
         """,
         (limit,),
     ).fetchall()
+
+
+def get_articles_using_part_number(conn: sqlite3.Connection, part_number: str) -> list[sqlite3.Row]:
+    value = str(part_number or "").strip()
+    if not value:
+        return []
+    return conn.execute(
+        """
+        SELECT
+            a.id AS article_id,
+            a.article_number,
+            a.title,
+            bl.item_no,
+            bl.qty,
+            bl.revision,
+            p.part_number
+        FROM bom_lines bl
+        JOIN parts p ON p.id = bl.part_id
+        JOIN articles a ON a.id = bl.article_id
+        WHERE UPPER(p.part_number) = UPPER(?)
+        ORDER BY a.article_number, bl.item_no
+        """,
+        (value,),
+    ).fetchall()
+
+
+def get_parent_articles_for_part_candidates(conn: sqlite3.Connection, candidates: list[str]) -> list[sqlite3.Row]:
+    normalized = sorted({str(v).strip().upper() for v in candidates if str(v).strip()})
+    if not normalized:
+        return []
+    placeholders = ",".join(["?"] * len(normalized))
+    return conn.execute(
+        f"""
+        SELECT
+            a.id AS article_id,
+            a.article_number,
+            a.title,
+            bl.item_no,
+            p.part_number,
+            bl.qty,
+            bl.revision
+        FROM bom_lines bl
+        JOIN parts p ON p.id = bl.part_id
+        JOIN articles a ON a.id = bl.article_id
+        WHERE UPPER(p.part_number) IN ({placeholders})
+        ORDER BY a.article_number, bl.item_no, p.part_number
+        """,
+        normalized,
+    ).fetchall()
+
+
+def get_parent_articles_for_part_candidates_like(conn: sqlite3.Connection, candidates: list[str]) -> list[sqlite3.Row]:
+    normalized = sorted({str(v).strip().upper() for v in candidates if str(v).strip()})
+    if not normalized:
+        return []
+    like_clauses = " OR ".join(["UPPER(p.part_number) LIKE ?"] * len(normalized))
+    params: list[object] = [f"%{value}%" for value in normalized]
+    return conn.execute(
+        f"""
+        SELECT
+            a.id AS article_id,
+            a.article_number,
+            a.title,
+            bl.item_no,
+            p.part_number,
+            bl.qty,
+            bl.revision
+        FROM bom_lines bl
+        JOIN parts p ON p.id = bl.part_id
+        JOIN articles a ON a.id = bl.article_id
+        WHERE ({like_clauses})
+        ORDER BY a.article_number, bl.item_no, p.part_number
+        """,
+        params,
+    ).fetchall()

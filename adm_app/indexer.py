@@ -22,6 +22,7 @@ from .excel_parser import parse_bom_file
 PART_REGEX = re.compile(r"\b([A-Z]{0,4}\d{3,}[A-Z0-9\-]*)\b", re.IGNORECASE)
 DOC_PART_PATTERN = re.compile(r"(?<!\d)(\d{2}-\d{5,6})(?!\d)", re.IGNORECASE)
 TOKEN_SPLIT_REGEX = re.compile(r"[^A-Z0-9]+")
+ARTICLE_NUMBER_PATTERN = re.compile(r"(?<!\d)(\d{3,8})(?!\d)")
 COMMON_TOKENS = {
     "THE",
     "AND",
@@ -37,13 +38,27 @@ COMMON_TOKENS = {
     "REV",
     "V",
 }
+COMMON_ARTICLE_TOKENS = {
+    "ART",
+    "ARTICLE",
+    "ASM",
+    "ASSEMBLY",
+    "PRODUCT",
+}
 DOC_EXT_TO_TYPE = {
     ".pdf": "pdf",
     ".step": "step",
     ".stp": "step",
     ".dwg": "dwg",
     ".dxf": "dwg",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".bmp": "image",
+    ".gif": "image",
+    ".webp": "image",
 }
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"}
 
 
 @dataclass
@@ -164,7 +179,7 @@ def run_index(conn: sqlite3.Connection, data_root: Path, force_doc_relink: bool 
 
 
 def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int, force_relink: bool = False) -> None:
-    doc_folders = ["PDF", "STEP-DXF", "SOP", "OVERIG"]
+    doc_folders = ["PDF", "STEP-DXF", "SOP", "OVERIG", "IMAGES"]
     managed_roots = [(data_root / folder).resolve() for folder in doc_folders]
     seen_paths: set[str] = set()
     existing_by_path: dict[str, tuple[int, str]] = {}
@@ -175,6 +190,7 @@ def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int, forc
         existing_by_path[path.casefold()] = (int(row["size_bytes"] or 0), str(row["modified_at"] or ""))
     parts_cache = load_parts_cache(conn)
     token_index = build_parts_token_index(parts_cache)
+    articles_cache = load_articles_cache(conn)
     for folder in doc_folders:
         folder_path = data_root / folder
         if not folder_path.exists():
@@ -193,14 +209,26 @@ def index_documents(conn: sqlite3.Connection, data_root: Path, run_id: int, forc
             part_id = None
             part_revision = None
             link_reason = None
-            part_id, part_revision, link_reason = find_part_match_with_revision(conn, file.name)
-            if part_id is None:
-                part_id = find_part_id_from_name(conn, file.name, parts_cache=parts_cache, token_index=token_index)
-                if part_id is not None:
-                    link_reason = "matched_part_fallback"
+            article_id = None
+            if folder.upper() == "IMAGES":
+                article_id = find_article_id_from_name(
+                    file.name,
+                    articles_cache=articles_cache,
+                )
+                if article_id is not None:
+                    link_reason = "matched_article_fallback"
+            else:
+                part_id, part_revision, link_reason = find_part_match_with_revision(conn, file.name)
+                if part_id is None:
+                    part_id = find_part_id_from_name(conn, file.name, parts_cache=parts_cache, token_index=token_index)
+                    if part_id is not None:
+                        link_reason = "matched_part_fallback"
             if part_id is not None:
                 linked_to_type = "part"
                 linked_id = part_id
+            elif article_id is not None:
+                linked_to_type = "article"
+                linked_id = article_id
             else:
                 linked_to_type = None
                 linked_id = None
@@ -296,11 +324,33 @@ def load_parts_cache(conn: sqlite3.Connection) -> list[dict[str, object]]:
     return cache
 
 
+def load_articles_cache(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    rows = conn.execute("SELECT id, article_number, title FROM articles").fetchall()
+    cache: list[dict[str, object]] = []
+    for row in rows:
+        article_number = str(row["article_number"] or "").strip().upper()
+        number_norm = normalize_for_match(article_number)
+        title = str(row["title"] or "").strip()
+        title_norm = normalize_for_match(title) if title else ""
+        title_tokens = tokenize_for_match(title, extra_common_tokens=COMMON_ARTICLE_TOKENS)
+        cache.append(
+            {
+                "id": int(row["id"]),
+                "article_number": article_number,
+                "number_norm": number_norm,
+                "title_norm": title_norm,
+                "title_tokens": title_tokens,
+            }
+        )
+    return cache
+
+
 def normalize_for_match(value: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
 
 
-def tokenize_for_match(value: str) -> set[str]:
+def tokenize_for_match(value: str, extra_common_tokens: set[str] | None = None) -> set[str]:
+    common_tokens = COMMON_TOKENS.union(extra_common_tokens or set())
     chunks = TOKEN_SPLIT_REGEX.split(str(value or "").upper())
     tokens: set[str] = set()
     for token in chunks:
@@ -309,7 +359,7 @@ def tokenize_for_match(value: str) -> set[str]:
             continue
         if token.isdigit():
             continue
-        if token in COMMON_TOKENS:
+        if token in common_tokens:
             continue
         tokens.add(token)
     return tokens
@@ -407,6 +457,31 @@ def find_part_id_from_name(
     if best_score < 0.35:
         return None
     return best_id
+
+
+def find_article_id_from_name(
+    filename: str,
+    articles_cache: list[dict[str, object]],
+) -> int | None:
+    stem = Path(filename).stem
+    filename_norm = normalize_for_match(stem)
+    if not filename_norm:
+        return None
+
+    for match in ARTICLE_NUMBER_PATTERN.finditer(stem):
+        match_norm = normalize_for_match(match.group(1))
+        if not match_norm:
+            continue
+        for item in articles_cache:
+            number_norm = str(item.get("number_norm") or "")
+            if number_norm and number_norm == match_norm:
+                return int(item["id"])
+
+    for item in articles_cache:
+        number_norm = str(item.get("number_norm") or "")
+        if number_norm and (filename_norm == number_norm or number_norm in filename_norm):
+            return int(item["id"])
+    return None
 
 
 def find_part_match_with_revision(conn: sqlite3.Connection, filename: str) -> tuple[int | None, str | None, str | None]:

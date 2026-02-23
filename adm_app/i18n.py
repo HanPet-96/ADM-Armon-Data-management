@@ -18,13 +18,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_search": "Search",
         "btn_expand_all": "Expand all",
         "btn_collapse_all": "Collapse all",
+        "btn_used_where_article": "Used where",
         "btn_add_to_order": "Add to order",
         "btn_save_bom": "Save BOM",
         "btn_revision_check": "Revision check",
         "lbl_select_article": "Select an article",
         "lbl_docs_article": "Linked documents (article)",
+        "lbl_article_image": "Article image",
         "lbl_pdf_preview": "PDF preview",
         "lbl_preview_default": "Select a BOM line with exactly one linked PDF.",
+        "lbl_image_preview_default": "Shows the top-level article image (if found).",
         "btn_close": "Close",
         "btn_clear": "Clear",
         "btn_export_xlsx_zip": "Export XLSX + ZIP",
@@ -66,7 +69,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "settings_help_pdf_engine": "Choose which embedded PDF preview engine ADM should use.",
         "settings_help_language": "Changes UI language for the full app.",
         "settings_help_developer_mode": "Enables developer-only BOM edit/revision tools (restricted by computer name).",
-        "settings_help_datastruct": "Root folder that contains BOMS, PDF, STEP-DXF, OVERIG and SOP.",
+        "settings_help_datastruct": "Root folder that contains BOMS, PDF, STEP-DXF, SOP, OVERIG and IMAGES.",
         "settings_help_export_path": "If set to an existing folder, order export uses this path directly without asking.",
         "settings_check_updates": "Check for updates",
         "settings_save": "Save",
@@ -84,6 +87,28 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "part_title": "Part: {part_number}",
         "part_type": "Part type: {part_type}",
         "part_docs": "Documents",
+        "used_where_title": "Article used-where",
+        "used_where_target": "Target article: {article}",
+        "used_where_open_hint": "Double-click a row to open article.",
+        "used_where_no_article_ref": "Selected BOM line is not linked to an article.",
+        "used_where_no_parents": "No parent articles found.",
+        "used_where_col_level": "Level",
+        "used_where_col_article": "Article",
+        "used_where_col_title": "Title",
+        "used_where_col_via_child": "Via child",
+        "used_where_col_via_part": "Via part",
+        "used_where_col_via_item": "Via item",
+        "used_where_col_qty": "Qty",
+        "used_where_col_rev": "Rev",
+        "used_where_col_node": "Node",
+        "used_where_col_item": "Item",
+        "used_where_col_via": "Via",
+        "used_where_no_usage": "No usage found for selected item.",
+        "used_where_tag_direct": "Direct usage",
+        "used_where_tag_parent": "Parent",
+        "used_where_via_subassembly": "in subassembly {item}",
+        "used_where_via_article": "from article {article}",
+        "used_where_related_files": "Related files",
         "order_select_first": "Select a BOM item first.",
         "order_include_title": "What would you like to include?",
         "order_include_label": "Select option:",
@@ -120,39 +145,57 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "help_dialog_markdown": """# ADM - Quick Help
 
 ## 1) Select datastruct folder
-- Click `Settings`
-- Set the `Datastruct folder`
-- Save
+- On first start, ADM requires a Datastruct folder selection.
+- If canceled on first start, ADM closes.
+- You can change the folder later in `Settings`.
+- Expected subfolders are `BOMS`, `PDF`, `STEP-DXF`, `SOP`, `OVERIG`, and `IMAGES`.
 
 ## 2) Re-index
 - Use `Re-index` to refresh all BOM and document links.
-- The app also runs a re-index automatically at startup.
+- Auto re-index on startup can be enabled/disabled in `Settings`.
 
 ## 3) Find articles and parts
 - Use the search box on the left.
 - Search supports article number, part number, and description text.
+- `Search in children` can be toggled in `Settings`.
 
 ## 4) Read the BOM tree
 - Select an article to load its BOM.
 - `Expand all` and `Collapse all` control tree visibility.
-- Double-click a subassembly reference to open that article.
+- Single-click on a parent row expands that dropdown.
+- Double-click any BOM row opens `Used where` for that selection.
 
-## 5) Linked documents and PDF preview
+## 5) Used where
+- Shows direct usage and parent-chain usage in a tree view.
+- Includes a `Related files` section for the selected usage node.
+- Double-click a usage node opens the linked article and selects the linked BOM item.
+
+## 6) Linked documents, article image and PDF preview
 - Selecting a BOM line loads linked documents.
+- `Article image` shows the top-level article image (if found).
+- The image preview stays tied to the selected top-level article.
 - The PDF preview automatically shows the first PDF in the list.
 - Multi-page PDFs can be navigated directly in the embedded viewer.
 
-## 6) Order list
+## 7) Order list
 - Select a BOM item and click `Add to order`.
 - Choose what to include: selected item, children, or both.
 - Export creates `order_lines.xlsx` and a ZIP with linked docs.
+- If `Order export folder` is configured, export uses it directly.
 
-## 7) Settings
-- Theme and language can be changed in `Settings`.
+## 8) Settings
+- Theme, language, PDF preview engine, and startup behavior are in `Settings`.
+- Default order export path is `%USERPROFILE%\\Documents\\ADM-Export`.
 - The app remembers settings between restarts.
+
+## 9) Help
+- Use `?` in the top-right corner to open this in-app help.
 """,
         "preview_no_pdf": "No PDF found in linked documents.",
+        "preview_no_image": "No image found in linked documents.",
         "preview_not_pdf": "Selected document is not a PDF.",
+        "preview_image_no_selected": "No image selected.",
+        "preview_image_failed_load": "Failed to load image preview.",
         "preview_no_selected": "No PDF selected.",
         "preview_component_missing": "PDF preview component is not available in this environment.",
         "preview_failed_load": "Failed to load PDF preview ({result}).",
@@ -201,12 +244,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_search": "Zoeken",
         "btn_expand_all": "Alles uitklappen",
         "btn_collapse_all": "Alles inklappen",
+        "btn_used_where_article": "Waar gebruikt",
         "btn_add_to_order": "Aan bestelling toevoegen",
         "btn_save_bom": "BOM opslaan",
         "btn_revision_check": "Revisiecheck",
         "lbl_select_article": "Selecteer een artikel",
         "lbl_docs_article": "Gekoppelde documenten (artikel)",
+        "lbl_article_image": "Artikelafbeelding",
         "lbl_pdf_preview": "PDF voorbeeld",
+        "lbl_image_preview_default": "Toont de afbeelding van het top-level artikel (indien gevonden).",
         "lbl_preview_default": "Selecteer een BOM-regel met precies één gekoppelde PDF.",
         "btn_close": "Sluiten",
         "btn_clear": "Wissen",
@@ -249,7 +295,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "settings_help_pdf_engine": "Kies welke ingebouwde PDF-previewengine ADM gebruikt.",
         "settings_help_language": "Wijzigt de UI-taal voor de hele app.",
         "settings_help_developer_mode": "Zet developer-tools aan voor BOM bewerken/revisiecheck (alleen op toegestane pc-namen).",
-        "settings_help_datastruct": "Rootmap met BOMS, PDF, STEP-DXF, OVERIG en SOP.",
+        "settings_help_datastruct": "Rootmap met BOMS, PDF, STEP-DXF, SOP, OVERIG en IMAGES.",
         "settings_help_export_path": "Als dit een bestaande map is, exporteert de bestellijst direct hierheen zonder extra dialoog.",
         "settings_check_updates": "Controleer updates",
         "settings_save": "Opslaan",
@@ -267,6 +313,28 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "part_title": "Part: {part_number}",
         "part_type": "Part type: {part_type}",
         "part_docs": "Documenten",
+        "used_where_title": "Artikel waar-gebruikt",
+        "used_where_target": "Doelartikel: {article}",
+        "used_where_open_hint": "Dubbelklik op een regel om artikel te openen.",
+        "used_where_no_article_ref": "Geselecteerde BOM-regel is niet gekoppeld aan een artikel.",
+        "used_where_no_parents": "Geen parent-artikelen gevonden.",
+        "used_where_col_level": "Niveau",
+        "used_where_col_article": "Artikel",
+        "used_where_col_title": "Titel",
+        "used_where_col_via_child": "Via child",
+        "used_where_col_via_part": "Via part",
+        "used_where_col_via_item": "Via item",
+        "used_where_col_qty": "Aantal",
+        "used_where_col_rev": "Rev",
+        "used_where_col_node": "Node",
+        "used_where_col_item": "Item",
+        "used_where_col_via": "Via",
+        "used_where_no_usage": "Geen gebruik gevonden voor geselecteerd item.",
+        "used_where_tag_direct": "Direct gebruik",
+        "used_where_tag_parent": "Parent",
+        "used_where_via_subassembly": "in subassembly {item}",
+        "used_where_via_article": "uit artikel {article}",
+        "used_where_related_files": "Gerelateerde bestanden",
         "order_select_first": "Selecteer eerst een BOM-item.",
         "order_include_title": "Wat wil je toevoegen?",
         "order_include_label": "Kies optie:",
@@ -303,39 +371,57 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "help_dialog_markdown": """# ADM - Korte Handleiding
 
 ## 1) Datastruct map kiezen
-- Klik op `Instellingen`
-- Stel de `Datastruct map` in
-- Sla op
+- Bij eerste start vraagt ADM verplicht om een Datastruct map.
+- Als je annuleert bij eerste start, sluit ADM af.
+- Je kunt de map later wijzigen via `Instellingen`.
+- Verwachte submappen zijn `BOMS`, `PDF`, `STEP-DXF`, `SOP`, `OVERIG` en `IMAGES`.
 
 ## 2) Herindexeren
 - Gebruik `Herindexeren` om BOM- en documentkoppelingen te vernieuwen.
-- De app draait ook automatisch een herindexering bij opstarten.
+- Automatisch herindexeren bij opstarten is instelbaar in `Instellingen`.
 
 ## 3) Artikelen en parts zoeken
 - Gebruik het zoekveld links.
 - Zoeken werkt op artikelnummer, partnummer en omschrijving.
+- `Zoeken in children` is instelbaar in `Instellingen`.
 
 ## 4) BOM-boom lezen
 - Selecteer een artikel om de BOM te laden.
 - `Alles uitklappen` en `Alles inklappen` sturen de boomweergave.
-- Dubbelklik op een subassembly-reference om dat artikel te openen.
+- Enkelklik op een parentregel klapt die dropdown open.
+- Dubbelklik op een BOM-regel opent `Waar gebruikt` voor die selectie.
 
-## 5) Gekoppelde documenten en PDF-preview
+## 5) Waar gebruikt
+- Toont direct gebruik en parent-ketens in een boomweergave.
+- Bevat onderin `Gerelateerde bestanden` voor de geselecteerde node.
+- Dubbelklik op een usage-node opent het gekoppelde artikel en selecteert de gekoppelde BOM-regel.
+
+## 6) Gekoppelde documenten, artikelafbeelding en PDF-preview
 - Bij selectie van een BOM-regel worden gekoppelde documenten geladen.
+- `Artikelafbeelding` toont de afbeelding van het top-level artikel (indien gevonden).
+- De afbeelding blijft gekoppeld aan het geselecteerde top-level artikel.
 - De PDF-preview toont automatisch de eerste PDF uit de lijst.
 - Bij meerpagina-PDF's kun je direct navigeren in de ingebouwde viewer.
 
-## 6) Bestellijst
+## 7) Bestellijst
 - Selecteer een BOM-item en klik `Aan bestelling toevoegen`.
 - Kies wat je wilt opnemen: selectie, children, of beide.
 - Export maakt `order_lines.xlsx` en een ZIP met gekoppelde documenten.
+- Als `Bestel-exportmap` is ingesteld, exporteert ADM direct daarheen.
 
-## 7) Instellingen
-- Thema en taal wijzig je via `Instellingen`.
+## 8) Instellingen
+- Thema, taal, PDF-preview-engine en opstartgedrag staan in `Instellingen`.
+- Standaard bestelpads is `%USERPROFILE%\\Documents\\ADM-Export`.
 - De app onthoudt deze instellingen tussen herstarts.
+
+## 9) Help
+- Gebruik `?` rechtsboven om deze in-app help te openen.
 """,
         "preview_no_pdf": "Geen PDF gevonden in gekoppelde documenten.",
+        "preview_no_image": "Geen afbeelding gevonden in gekoppelde documenten.",
         "preview_not_pdf": "Geselecteerd document is geen PDF.",
+        "preview_image_no_selected": "Geen afbeelding geselecteerd.",
+        "preview_image_failed_load": "Afbeelding kon niet worden geladen.",
         "preview_no_selected": "Geen PDF geselecteerd.",
         "preview_component_missing": "PDF-previewcomponent is niet beschikbaar in deze omgeving.",
         "preview_failed_load": "PDF preview laden mislukt ({result}).",

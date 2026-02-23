@@ -2058,21 +2058,21 @@
   ('_sqlite3.pyd',
    'C:\\Program Files\\Python314\\DLLs\\_sqlite3.pyd',
    'EXTENSION'),
-  ('VCRUNTIME140_1.dll',
-   'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
+  ('VCRUNTIME140.dll',
+   'C:\\Program Files\\Python314\\VCRUNTIME140.dll',
    'BINARY'),
   ('shiboken6\\MSVCP140_2.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\MSVCP140_2.dll',
    'BINARY'),
-  ('VCRUNTIME140.dll',
-   'C:\\Program Files\\Python314\\VCRUNTIME140.dll',
-   'BINARY'),
   ('shiboken6\\MSVCP140.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\MSVCP140.dll',
+   'BINARY'),
+  ('VCRUNTIME140_1.dll',
+   'C:\\Program Files\\Python314\\VCRUNTIME140_1.dll',
    'BINARY'),
   ('python3.dll', 'C:\\Program Files\\Python314\\python3.dll', 'BINARY'),
   ('shiboken6\\shiboken6.abi3.dll',
@@ -2089,15 +2089,15 @@
   ('libffi-8.dll',
    'C:\\Program Files\\Python314\\DLLs\\libffi-8.dll',
    'BINARY'),
-  ('shiboken6\\VCRUNTIME140_1.dll',
-   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
-   'Management) - Project ADM\\TestStructuur '
-   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\VCRUNTIME140_1.dll',
-   'BINARY'),
   ('shiboken6\\VCRUNTIME140.dll',
    'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
    'Management) - Project ADM\\TestStructuur '
    'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\VCRUNTIME140.dll',
+   'BINARY'),
+  ('shiboken6\\VCRUNTIME140_1.dll',
+   'D:\\Onedrive\\OneDrive - Armon Products B.V\\Project ADM (Armon Document '
+   'Management) - Project ADM\\TestStructuur '
+   'ADM\\Script\\ADM-Armon-Data-Management\\.venv\\Lib\\site-packages\\shiboken6\\VCRUNTIME140_1.dll',
    'BINARY'),
   ('sqlite3.dll', 'C:\\Program Files\\Python314\\DLLs\\sqlite3.dll', 'BINARY'),
   ('PySide6\\PySide6_Addons.json',

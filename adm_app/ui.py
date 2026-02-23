@@ -14,7 +14,7 @@ import zipfile
 from openpyxl import Workbook, load_workbook
 
 from PySide6.QtCore import QEasingCurve, QPointF, Property, QPropertyAnimation, QRect, QRectF, QSize, QTimer, Qt, QUrl
-from PySide6.QtGui import QColor, QCursor, QIcon, QPainter, QPalette
+from PySide6.QtGui import QColor, QCursor, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -51,7 +51,7 @@ from PySide6.QtWidgets import (
 from . import __version__
 from .excel_parser import detect_header
 from .i18n import normalize_language, tr
-from .indexer import parse_document_part_and_revision, run_index
+from .indexer import IMAGE_EXTENSIONS, parse_document_part_and_revision, run_index
 from .mapping import parse_qty
 from .settings_store import AppSettings, app_data_dir, save_settings
 from .search import (
@@ -59,10 +59,12 @@ from .search import (
     get_article_by_number,
     get_article_bom_lines,
     get_article_ids_by_numbers,
+    get_articles_using_part_number,
     get_documents_for_part_revision,
     get_documents_for_link,
     get_part_detail,
     get_part_usages,
+    get_parent_articles_for_part_candidates_like,
     get_unlinked_documents,
     list_articles,
 )
@@ -222,6 +224,110 @@ class UnlinkedDocsDialog(QDialog):
         path_item = self.table.item(item.row(), 2)
         if path_item:
             open_file(str(path_item.data(Qt.ItemDataRole.UserRole)))
+
+
+class ArticleUsedWhereDialog(QDialog):
+    def __init__(
+        self, root_label: str, on_open_article, language: str = "en", parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
+        self.language = normalize_language(language)
+        self.on_open_article = on_open_article
+        self.setWindowTitle(tr(self.language, "used_where_title"))
+        icon = get_app_icon()
+        if icon is not None:
+            self.setWindowIcon(icon)
+        self.resize(980, 520)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(tr(self.language, "used_where_target", article=root_label)))
+        layout.addWidget(QLabel(tr(self.language, "used_where_open_hint")))
+        self.main_splitter = QSplitter(Qt.Orientation.Vertical)
+        layout.addWidget(self.main_splitter)
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(8)
+        self.tree.setHeaderLabels(
+            [
+                tr(self.language, "used_where_col_node"),
+                tr(self.language, "used_where_col_article"),
+                tr(self.language, "used_where_col_title"),
+                tr(self.language, "used_where_col_item"),
+                tr(self.language, "used_where_col_qty"),
+                tr(self.language, "used_where_col_rev"),
+                tr(self.language, "used_where_col_via_part"),
+                tr(self.language, "used_where_col_via"),
+            ]
+        )
+        self.tree.header().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.tree.header().setStretchLastSection(True)
+        self.tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.main_splitter.addWidget(self.tree)
+        docs_widget = QWidget()
+        docs_layout = QVBoxLayout(docs_widget)
+        docs_layout.setContentsMargins(0, 0, 0, 0)
+        self.related_docs_label = QLabel(tr(self.language, "used_where_related_files"))
+        docs_layout.addWidget(self.related_docs_label)
+        self.related_docs_list = QListWidget()
+        docs_layout.addWidget(self.related_docs_list)
+        self.main_splitter.addWidget(docs_widget)
+        self.main_splitter.setStretchFactor(0, 3)
+        self.main_splitter.setStretchFactor(1, 2)
+        self.main_splitter.setSizes([340, 180])
+        self.tree.itemDoubleClicked.connect(self.open_selected_article)
+        self.tree.itemSelectionChanged.connect(self.on_tree_selection_changed)
+        self.related_docs_list.itemDoubleClicked.connect(lambda item: open_file(str(item.data(Qt.ItemDataRole.UserRole) or "")))
+
+    def add_branch(self, row: dict[str, object], parent_item: QTreeWidgetItem | None = None) -> QTreeWidgetItem:
+        values = [
+            str(row.get("node_type") or ""),
+            str(row.get("article_number") or ""),
+            str(row.get("title") or ""),
+            str(row.get("item_no") or ""),
+            str(row.get("qty") or ""),
+            str(row.get("revision") or ""),
+            str(row.get("via_part") or ""),
+            str(row.get("via_label") or ""),
+        ]
+        node = QTreeWidgetItem(values)
+        node.setData(1, Qt.ItemDataRole.UserRole, int(row.get("article_id") or 0))
+        node.setData(0, Qt.ItemDataRole.UserRole, row)
+        if parent_item is None:
+            self.tree.addTopLevelItem(node)
+        else:
+            parent_item.addChild(node)
+        return node
+
+    def open_selected_article(self, item: QTreeWidgetItem, _column: int) -> None:
+        if item is None:
+            return
+        payload = item.data(0, Qt.ItemDataRole.UserRole)
+        if not isinstance(payload, dict):
+            return
+        article_id = int(payload.get("article_id") or 0)
+        if article_id <= 0:
+            return
+        self.on_open_article(payload)
+
+    def on_tree_selection_changed(self) -> None:
+        self.related_docs_list.clear()
+        selected = self.tree.selectedItems()
+        if not selected:
+            return
+        payload = selected[0].data(0, Qt.ItemDataRole.UserRole)
+        if not isinstance(payload, dict):
+            return
+        docs = payload.get("related_docs")
+        if not isinstance(docs, list):
+            return
+        for doc in docs:
+            if not isinstance(doc, dict):
+                continue
+            label = str(doc.get("label") or doc.get("filename") or "")
+            path = str(doc.get("path") or "")
+            if not path:
+                continue
+            item = QListWidgetItem(label if label else Path(path).name)
+            item.setData(Qt.ItemDataRole.UserRole, path)
+            self.related_docs_list.addItem(item)
 
 
 class RevisionSuggestionDialog(QDialog):
@@ -741,6 +847,8 @@ class MainWindow(QMainWindow):
         self.current_pdf_path = ""
         self.current_pdf_page = 0
         self.current_pdf_page_count = 0
+        self.current_image_path = ""
+        self.current_image_pixmap = QPixmap()
         self._pdf_resize_timer = QTimer(self)
         self._pdf_resize_timer.setSingleShot(True)
         self._pdf_resize_timer.timeout.connect(self._refresh_pdf_fit)
@@ -860,6 +968,9 @@ class MainWindow(QMainWindow):
         docs_preview_layout.addWidget(self.docs_preview_splitter)
         docs_preview_area.setMinimumWidth(0)
 
+        self.docs_image_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.docs_preview_splitter.addWidget(self.docs_image_splitter)
+
         docs_list_container = QWidget()
         docs_list_layout = QVBoxLayout(docs_list_container)
         docs_list_layout.setContentsMargins(0, 0, 0, 0)
@@ -870,14 +981,41 @@ class MainWindow(QMainWindow):
         self.docs_list = QListWidget()
         docs_list_layout.addWidget(self.docs_list)
         docs_list_container.setMinimumWidth(0)
-        self.docs_preview_splitter.addWidget(docs_list_container)
+        self.docs_image_splitter.addWidget(docs_list_container)
+
+        image_container = QWidget()
+        image_layout = QVBoxLayout(image_container)
+        image_layout.setContentsMargins(0, 0, 0, 0)
+        self.image_preview_title = QLabel(tr(self.language, "lbl_article_image"))
+        self.image_preview_title.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        image_layout.addWidget(self.image_preview_title)
+        self.image_preview_stack = QStackedWidget()
+        self.image_preview_message = QLabel(tr(self.language, "lbl_image_preview_default"))
+        self.image_preview_message.setWordWrap(True)
+        self.image_preview_message.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.image_preview_message.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.image_preview_stack.addWidget(self.image_preview_message)
+        self.image_preview_label = QLabel()
+        self.image_preview_label.setObjectName("imagePreviewLabel")
+        self.image_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Avoid QLabel/pixmap size-hint feedback loops during window resize.
+        self.image_preview_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.image_preview_label.setMinimumSize(0, 0)
+        self.image_preview_label.setScaledContents(False)
+        self.image_preview_label.setStyleSheet("#imagePreviewLabel { background: #FFFFFF; border: 1px solid #D1D5DB; }")
+        self.image_preview_stack.addWidget(self.image_preview_label)
+        image_layout.addWidget(self.image_preview_stack)
+        image_container.setMinimumWidth(0)
+        self.docs_image_splitter.addWidget(image_container)
+        self.docs_image_splitter.setStretchFactor(0, 1)
+        self.docs_image_splitter.setStretchFactor(1, 1)
 
         preview_container = QWidget()
         preview_layout = QVBoxLayout(preview_container)
         preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_title = QLabel(tr(self.language, "lbl_pdf_preview"))
-        preview_title.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        preview_layout.addWidget(preview_title)
+        self.preview_title = QLabel(tr(self.language, "lbl_pdf_preview"))
+        self.preview_title.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        preview_layout.addWidget(self.preview_title)
         self.preview_stack = QStackedWidget()
         self.preview_message = QLabel(tr(self.language, "lbl_preview_default"))
         self.preview_message.setWordWrap(True)
@@ -917,7 +1055,7 @@ class MainWindow(QMainWindow):
         preview_container.setMinimumWidth(0)
         self.docs_preview_splitter.addWidget(preview_container)
         self.docs_preview_splitter.setStretchFactor(0, 1)
-        self.docs_preview_splitter.setStretchFactor(1, 1)
+        self.docs_preview_splitter.setStretchFactor(1, 2)
 
         self.main_splitter.addWidget(bom_container)
         self.main_splitter.addWidget(docs_preview_area)
@@ -983,7 +1121,8 @@ class MainWindow(QMainWindow):
         self.article_table.itemSelectionChanged.connect(self.load_selected_article)
         self.docs_list.itemDoubleClicked.connect(lambda item: open_file(item.data(Qt.ItemDataRole.UserRole)))
         self.docs_list.itemSelectionChanged.connect(self.preview_selected_document)
-        self.bom_tree.itemDoubleClicked.connect(self.open_bom_line)
+        self.bom_tree.itemDoubleClicked.connect(lambda _item, _column: self.open_article_used_where())
+        self.bom_tree.itemClicked.connect(self.on_bom_item_clicked)
         self.bom_tree.itemSelectionChanged.connect(self.load_docs_for_selected_bom_line)
         self.bom_tree.itemChanged.connect(self.on_bom_item_changed)
         self.expand_all_button.clicked.connect(self.expand_bom_children_only)
@@ -1025,6 +1164,9 @@ class MainWindow(QMainWindow):
         self.revision_suggest_button.setText(tr(self.language, "btn_revision_check"))
         self.save_bom_button.setText(tr(self.language, "btn_save_bom"))
         self.docs_context_label.setText(tr(self.language, "lbl_docs_article"))
+        self.image_preview_title.setText(tr(self.language, "lbl_article_image"))
+        self.image_preview_message.setText(tr(self.language, "lbl_image_preview_default"))
+        self.preview_title.setText(tr(self.language, "lbl_pdf_preview"))
         self.preview_message.setText(tr(self.language, "lbl_preview_default"))
         self.close_order_drawer_button.setText(tr(self.language, "btn_close"))
         self.export_order_button.setText(tr(self.language, "btn_export_xlsx_zip"))
@@ -1180,6 +1322,7 @@ class MainWindow(QMainWindow):
         else:
             self.bom_tree.collapseAll()
             root_item.setExpanded(True)
+        self.load_top_article_image(article_id)
         self.load_article_documents(article_id)
         selected_item = self.find_bom_item_for_search(all_items, self.active_search_term) or first_item
         if selected_item is not None:
@@ -1274,6 +1417,7 @@ class MainWindow(QMainWindow):
             current = current.parent()
 
     def _set_initial_split_sizes(self) -> None:
+        self.docs_image_splitter.setSizes([5, 5])
         total_height = self.docs_preview_splitter.height()
         if total_height <= 0:
             self.docs_preview_splitter.setSizes([3, 7])
@@ -1333,6 +1477,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
         self._resize_bom_columns_to_fit()
+        self._refresh_image_fit()
         if self.current_pdf_path:
             self._pdf_resize_timer.start(120)
         self.layout_order_drawer()
@@ -1350,6 +1495,26 @@ class MainWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, doc["path"])
             self.docs_list.addItem(item)
         self.preview_first_pdf_in_list()
+
+    def load_top_article_image(self, article_id: int) -> None:
+        self.set_image_preview_message(tr(self.language, "preview_no_image"))
+        article = get_article(self.conn, article_id)
+        if not article:
+            return
+        article_number = str(article["article_number"] or "").strip().upper()
+        docs = get_documents_for_link(self.conn, "article", article_id)
+        for doc in docs:
+            path = str(doc["path"] or "")
+            if not path:
+                continue
+            ext = Path(path).suffix.lower()
+            if ext not in IMAGE_EXTENSIONS:
+                continue
+            filename = str(doc["filename"] or "").upper()
+            if article_number and article_number not in filename:
+                continue
+            self.preview_image(path)
+            return
 
     def load_docs_for_selected_bom_line(self) -> None:
         current = self.bom_tree.currentItem()
@@ -1503,8 +1668,267 @@ class MainWindow(QMainWindow):
         dlg = PartDialog(self.conn, part_number, language=self.language, parent=self)
         dlg.exec()
 
+    def on_bom_item_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
+        if item is None:
+            return
+        if item.childCount() > 0 and not item.isExpanded():
+            item.setExpanded(True)
+
     def open_unlinked_docs(self) -> None:
         dlg = UnlinkedDocsDialog(self.conn, language=self.language, parent=self)
+        dlg.exec()
+
+    def open_article_by_id_from_dialog(self, payload: dict[str, object]) -> None:
+        article_id = int(payload.get("article_id") or 0)
+        if article_id <= 0:
+            return
+        if self.select_article_in_table(article_id):
+            self.display_article_by_id(article_id)
+        else:
+            self.display_article_by_id(article_id)
+
+        target_item_no = str(payload.get("item_no") or "").strip()
+        target_part = str(payload.get("via_part") or payload.get("part_number") or "").strip()
+        target = self.find_bom_item_by_item_no_or_part(target_item_no, target_part)
+        if target is not None:
+            self.expand_path_to_item(target)
+            self.bom_tree.setCurrentItem(target)
+            self.bom_tree.scrollToItem(target)
+
+    def find_bom_item_by_item_no_or_part(self, item_no: str, part_number: str) -> QTreeWidgetItem | None:
+        target_item_no = (item_no or "").strip()
+        target_part = (part_number or "").strip().lower()
+        if self.bom_tree.topLevelItemCount() == 0:
+            return None
+        root = self.bom_tree.topLevelItem(0)
+
+        def walk(node: QTreeWidgetItem) -> QTreeWidgetItem | None:
+            node_item = str(node.text(0) or "").strip()
+            node_part = str(node.data(1, Qt.ItemDataRole.UserRole) or node.text(1) or "").strip().lower()
+            if target_item_no and node_item == target_item_no:
+                if not target_part or node_part == target_part:
+                    return node
+            if target_part and node_part == target_part and (not target_item_no):
+                return node
+            for i in range(node.childCount()):
+                found = walk(node.child(i))
+                if found is not None:
+                    return found
+            return None
+
+        for i in range(root.childCount()):
+            found = walk(root.child(i))
+            if found is not None:
+                return found
+        return None
+
+    def _find_parent_rows_for_article_number(self, article_number: str) -> list[sqlite3.Row]:
+        candidates = self.article_number_candidates(article_number)
+        candidate_set = {c.upper() for c in candidates}
+        parent_rows = get_parent_articles_for_part_candidates_like(self.conn, candidates)
+        filtered: list[sqlite3.Row] = []
+        for parent in parent_rows:
+            part_number = str(parent["part_number"] or "").strip()
+            part_candidates = {c.upper() for c in self.article_number_candidates(part_number)}
+            if candidate_set & part_candidates:
+                filtered.append(parent)
+        return filtered
+
+    def build_item_chain_label(self, item_no: str) -> str:
+        value = (item_no or "").strip()
+        if not value:
+            return ""
+        chain: list[str] = []
+        current = self.parent_item_no(value)
+        while current:
+            chain.append(current)
+            current = self.parent_item_no(current)
+        if not chain:
+            return ""
+        return " > ".join(chain)
+
+    def collect_related_files_for_used_where(
+        self, article_id: int, part_number: str = "", revision: str = ""
+    ) -> list[dict[str, str]]:
+        out: list[dict[str, str]] = []
+        seen: set[str] = set()
+
+        article_docs = get_documents_for_link(self.conn, "article", int(article_id))
+        for doc in article_docs:
+            path = str(doc["path"] or "")
+            if not path or path in seen:
+                continue
+            seen.add(path)
+            out.append({"label": f"[Article] {str(doc['filename'] or '')}", "path": path, "filename": str(doc["filename"] or "")})
+
+        pn = str(part_number or "").strip()
+        if pn:
+            part = get_part_detail(self.conn, pn)
+            if part:
+                docs = get_documents_for_part_revision(self.conn, int(part["id"]), str(revision or "").strip() or None)
+                for doc in docs:
+                    path = str(doc["path"] or "")
+                    if not path or path in seen:
+                        continue
+                    seen.add(path)
+                    out.append({"label": f"[Part] {str(doc['filename'] or '')}", "path": path, "filename": str(doc["filename"] or "")})
+        return out
+
+    def _add_parent_branches_recursive(
+        self,
+        dialog: ArticleUsedWhereDialog,
+        parent_item: QTreeWidgetItem,
+        article_id: int,
+        article_number: str,
+        depth: int,
+        path_ids: set[int],
+    ) -> None:
+        if depth >= 20:
+            return
+        parent_rows = self._find_parent_rows_for_article_number(article_number)
+        seen_lines: set[tuple[int, str, str]] = set()
+        for row in parent_rows:
+            parent_id = int(row["article_id"])
+            if parent_id in path_ids:
+                continue
+            part_number = str(row["part_number"] or "")
+            item_no = str(row["item_no"] or "")
+            dedupe_key = (parent_id, part_number, item_no)
+            if dedupe_key in seen_lines:
+                continue
+            seen_lines.add(dedupe_key)
+            branch = dialog.add_branch(
+                {
+                        "node_type": tr(self.language, "used_where_tag_parent"),
+                        "article_id": parent_id,
+                        "article_number": str(row["article_number"] or ""),
+                        "title": str(row["title"] or ""),
+                    "item_no": item_no,
+                        "qty": "" if row["qty"] is None else str(row["qty"]),
+                    "revision": str(row["revision"] or ""),
+                    "via_part": part_number,
+                    "via_label": tr(self.language, "used_where_via_article", article=article_number),
+                    "related_docs": self.collect_related_files_for_used_where(
+                        article_id=parent_id,
+                        part_number=part_number,
+                        revision=str(row["revision"] or ""),
+                    ),
+                },
+                parent_item=parent_item,
+            )
+            new_path = set(path_ids)
+            new_path.add(parent_id)
+            self._add_parent_branches_recursive(
+                dialog=dialog,
+                parent_item=branch,
+                article_id=parent_id,
+                article_number=str(row["article_number"] or ""),
+                depth=depth + 1,
+                path_ids=new_path,
+            )
+
+    def open_article_used_where(self) -> None:
+        current = self.bom_tree.currentItem()
+        if current is None:
+            QMessageBox.information(self, tr(self.language, "used_where_title"), tr(self.language, "order_select_first"))
+            return
+
+        part_number = str(current.data(1, Qt.ItemDataRole.UserRole) or "").strip()
+        node_type = str(current.data(5, Qt.ItemDataRole.UserRole) or "")
+
+        if node_type == "article":
+            part_number = str(current.data(1, Qt.ItemDataRole.UserRole) or "").strip()
+            if not part_number:
+                part_number = str(current.text(1) or "").strip()
+        if not part_number:
+            QMessageBox.information(self, tr(self.language, "used_where_title"), tr(self.language, "used_where_no_usage"))
+            return
+
+        direct_rows = get_articles_using_part_number(self.conn, part_number)
+        fallback_article_id = self.resolve_article_ref_id(part_number)
+
+        if not direct_rows and fallback_article_id is None:
+            QMessageBox.information(self, tr(self.language, "used_where_title"), tr(self.language, "used_where_no_usage"))
+            return
+
+        dlg = ArticleUsedWhereDialog(
+            root_label=part_number,
+            on_open_article=self.open_article_by_id_from_dialog,
+            language=self.language,
+            parent=self,
+        )
+
+        if direct_rows:
+            for row in direct_rows:
+                article_id = int(row["article_id"])
+                article_number = str(row["article_number"] or "")
+                item_no = str(row["item_no"] or "")
+                parent_chain = self.build_item_chain_label(item_no)
+                if parent_chain:
+                    via_label = tr(self.language, "used_where_via_subassembly", item=parent_chain)
+                else:
+                    via_label = tr(self.language, "used_where_tag_direct")
+                top = dlg.add_branch(
+                    {
+                        "node_type": tr(self.language, "used_where_tag_direct"),
+                        "article_id": article_id,
+                        "article_number": article_number,
+                        "title": str(row["title"] or ""),
+                        "item_no": item_no,
+                        "qty": "" if row["qty"] is None else str(row["qty"]),
+                        "revision": str(row["revision"] or ""),
+                        "via_part": str(row["part_number"] or ""),
+                        "via_label": via_label,
+                        "related_docs": self.collect_related_files_for_used_where(
+                            article_id=article_id,
+                            part_number=str(row["part_number"] or ""),
+                            revision=str(row["revision"] or ""),
+                        ),
+                    }
+                )
+                self._add_parent_branches_recursive(
+                    dialog=dlg,
+                    parent_item=top,
+                    article_id=article_id,
+                    article_number=article_number,
+                    depth=0,
+                    path_ids={article_id},
+                )
+        elif fallback_article_id is not None:
+            article = get_article(self.conn, int(fallback_article_id))
+            if article is not None:
+                article_number = str(article["article_number"] or "")
+                top = dlg.add_branch(
+                    {
+                        "node_type": tr(self.language, "used_where_tag_direct"),
+                        "article_id": int(article["id"]),
+                        "article_number": article_number,
+                        "title": str(article["title"] or ""),
+                        "item_no": "",
+                        "qty": "",
+                        "revision": "",
+                        "via_part": part_number,
+                        "via_label": tr(self.language, "used_where_tag_direct"),
+                        "related_docs": self.collect_related_files_for_used_where(
+                            article_id=int(article["id"]),
+                            part_number=part_number,
+                            revision="",
+                        ),
+                    }
+                )
+                self._add_parent_branches_recursive(
+                    dialog=dlg,
+                    parent_item=top,
+                    article_id=int(article["id"]),
+                    article_number=article_number,
+                    depth=0,
+                    path_ids={int(article["id"])},
+                )
+
+        for i in range(dlg.tree.topLevelItemCount()):
+            dlg.tree.topLevelItem(i).setExpanded(True)
+        if dlg.tree.topLevelItemCount() > 0:
+            dlg.tree.setCurrentItem(dlg.tree.topLevelItem(0))
         dlg.exec()
 
     def add_selected_bom_to_order(self) -> None:
@@ -2299,6 +2723,38 @@ class MainWindow(QMainWindow):
         self.current_pdf_page_count = 0
         self.update_preview_controls()
 
+    def set_image_preview_message(self, message: str) -> None:
+        self.image_preview_message.setText(message)
+        self.image_preview_stack.setCurrentWidget(self.image_preview_message)
+        self.current_image_path = ""
+        self.current_image_pixmap = QPixmap()
+
+    def _refresh_image_fit(self) -> None:
+        if self.current_image_pixmap.isNull():
+            return
+        target = self.image_preview_label.size()
+        if target.width() <= 1 or target.height() <= 1:
+            return
+        scaled = self.current_image_pixmap.scaled(
+            target,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.image_preview_label.setPixmap(scaled)
+
+    def preview_image(self, path: str) -> None:
+        if not path:
+            self.set_image_preview_message(tr(self.language, "preview_image_no_selected"))
+            return
+        pixmap = QPixmap(path)
+        if pixmap.isNull():
+            self.set_image_preview_message(tr(self.language, "preview_image_failed_load"))
+            return
+        self.current_image_path = path
+        self.current_image_pixmap = pixmap
+        self.image_preview_stack.setCurrentWidget(self.image_preview_label)
+        self._refresh_image_fit()
+
     def update_preview_controls(self) -> None:
         return
 
@@ -2492,14 +2948,14 @@ def apply_app_theme(theme_mode: str) -> None:
         return
 
     palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor("#FFFFFF"))
+    palette.setColor(QPalette.ColorRole.Window, QColor("#ECEFF3"))
     palette.setColor(QPalette.ColorRole.WindowText, QColor("#111111"))
-    palette.setColor(QPalette.ColorRole.Base, QColor("#FFFFFF"))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#F7F7F7"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#F5F6F8"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#ECEFF3"))
     palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#FFFFFF"))
     palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#111111"))
     palette.setColor(QPalette.ColorRole.Text, QColor("#111111"))
-    palette.setColor(QPalette.ColorRole.Button, QColor("#F3F4F6"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#E7EAF0"))
     palette.setColor(QPalette.ColorRole.ButtonText, QColor("#111111"))
     palette.setColor(QPalette.ColorRole.BrightText, QColor("#111111"))
     palette.setColor(QPalette.ColorRole.Highlight, QColor("#97C21E"))
@@ -2508,19 +2964,19 @@ def apply_app_theme(theme_mode: str) -> None:
     app.setStyleSheet(
         """
         QLineEdit, QTableWidget, QTreeWidget, QListWidget, QComboBox {
-            background: #FFFFFF;
+            background: #F5F6F8;
             color: #111111;
             border: 1px solid #D1D5DB;
         }
         QPushButton {
-            background: #F3F4F6;
+            background: #E7EAF0;
             color: #111111;
             border: 1px solid #D1D5DB;
             padding: 4px 10px;
         }
-        QPushButton:hover { background: #E5E7EB; }
+        QPushButton:hover { background: #DCE1E8; }
         QHeaderView::section {
-            background: #F9FAFB;
+            background: #EEF1F5;
             color: #111111;
             border: 1px solid #D1D5DB;
             padding: 4px;
